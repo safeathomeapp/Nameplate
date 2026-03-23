@@ -1,0 +1,41 @@
+Amazon,Jaguar Warrior Blocker,2,M,Piranha Warrior Blitzer,2,M,Python Warrior Thrower,2,M,Eagle Warrior Linewomen,16,M
+Amazon (Just Pos),Blocker,2,M,Blitzer,2,M,Thrower,2,M,Linewomen,16,M
+Black Orc,Trained Troll,1,L,Black Orc,6,M,Goblin Bruiser,12,S
+Black Orc (Just Pos),Trained Troll,1,L,Black Orc,6,M,Bruiser,12,S
+Bretonia,Knight Errant,16,M,Knight Of The Realm,4,M,Questing Knight,2,M,Grail Knight,1,M
+Chaos Chosen,Minotaur,1,L,Chaos Ogre,1,L,Chaos Troll,1,L,Chosen Blocker,4,M,Beastman,16,M
+Chaos Chosen (Just Pos),Minotaur,1,L,Ogre,1,L,Troll,1,L,Blocker,4,M,Beastman,16,M
+Chaos Dwarf,Enslaved Minotaur,1,L,Bull Centaur,2,L,FlameSmith,2,M,Chaos Dwarf Blocker,4,M,Sneaky Stabba,2,M,Hobgoblin,16,M
+Chaos Dwarf (Just Pos),Enslaved Minotaur,1,L,Bull Centaur,2,L,FlameSmith,2,M,Blocker,4,M,Sneaky Stabba,2,M,Hobgoblin,16,M
+Chaos Renegade,Renegade Rat Ogre,1,L,Renegade Minotaur,1,L,Renegade Ogre,1,L,Renegade Troll,1,L,Dark Elf,1,M,Skaven,1,M,Orc,1,M,Goblin,1,S,Thrower,1,M,Renegade Lineman,12,M
+Chaos Renegade (Just Pos),Rat Ogre,1,L,Minotaur,1,L,Ogre,1,L,Troll,1,L,Dark Elf,1,M,Skaven,1,M,Orc,1,M,Goblin,1,S,Thrower,1,M,Lineman,12,M
+Daemons of Khorne,Pit Fighters,16,m,Bloodletter,4,m,Khorne Heralds,4,m,Bloodthirster,1,L
+Dark Elf,Dark Elf Linemen,12,M,Dark Elf Runner,2,M,Dark Elf Blitzer,4,M,Assassin,2,M,Witch Elf,2,M
+Dark Elf (Just Pos),Linemen,12,M,Runner,2,M,Blitzer,4,M,Assassin,2,M,Witch Elf,2,M
+Dwarf,Dwarf Linemen,12,M,Dwarf Runner,2,M,Dwarf Blitzer,2,M,Troll Slayer,2,M,Deathroller,1,L
+Dwarf (Just Pos),Linemen,12,M,Runner,2,M,Blitzer,2,M,Troll Slayer,2,M,Deathroller,1,L
+Elven Union,Elf Linemen,12,M,Elf Thrower,2,M,Elf Catcher,4,M,Elf Blitzer,2,M
+Elven Union,Linemen,12,M,Thrower,2,M,Catcher,4,M,Blitzer,2,M
+Gnomes,Gnome linemen,16,S,Gnome Illusionist,2,S,Woodland Fox,2,S,Gnome Beastmaster,2,S,Altern Forest Treeman,1,L
+Goblins,Goblin,16,S,Bomma,1,S,Looney,1,S,Fanatic,1,S,Pogoer,1,S,‘Ooligan,1,S,Doom Diver,1,S,Trained Troll,2,L
+Halflings,Halfling Hopeful,16,S,Halfling Hefty,2,S,Halfling Catcher,2,S,Altern Forest Treeman,1,L
+High Elf,High Elf Linemen,12,M,High Elf Phoenix Thrower,2,M,High Elf Lion Warrior Catcher,4,M,High Elf Dragon Warrior Blitzer,2,M
+Humans,Lineman,12,M,Thrower,2,M,Catcher,4,M,Blitzer,4,M,Halfling,1,S,Ogre,1,L
+Imperial Nobility,Imperial Retainer Linemen,12,M,Imperial Thrower,2,M,Imperial Noble Blitzer,2,M,Imperial Bodyguards,4,M,Ogre,1,L
+Khemri,Skeleton Linemen,16,M,Anointed Thrower,2,M,Anointed Blitzer,2,M,Tomb Guardian,4,M
+Khorne,Bloodborn Marauder Linemen,16,M,Khorngors,4,M,Bloodseekers,4,M,Bloodspawn,1,L
+Lizardmen,Skink Linemen,12,S,Chameleon Skink,2,S,Saurus Blocker,6,M,Kroxigor,1,L
+Necromantic Horror,Zombie,16,M,Ghoul Runners,2,M,Wraith,2,M,Werewolf,2,M,Flesh Golem,2,M
+Norse,Norse Raider Linemen,16,M,Beer Boars,2,S,Norse Berserker,2,M,Valkyrie,2,M,Ulfwerener,2,M,Yhetee,1,L
+Nurgle,Rotter,12,M,Pestigor,4,M,Bloater,4,M,Rotspawn,1,L
+Ogre,Gnoblar,16,S,Ogre,5,L,Runt Punter,1,L
+Old World Aliance,Human Linemen,12,M,Human Thrower,1,M,Human Catcher,1,M,Human Blitzer,1,M,Dwarf Blocker,2,M,Dwarf Runner,1,M,Dwarf Blitzer,1,M,Troll Slayer,1,M,Halfling,2,S,Ogre,1,L,Altern Forest Treeman,1,L
+Orc,Orc Linemen,16,M,Orc Thrower,2,M,Orc Blitzer,4,M,Orc Big Un,4,M,Goblin,4,S,Untrained Troll,1,L
+Shambling Undead,Skeleton Linemen,12,M,Zombie Linemen,12,M,Ghoul Runner,4,M,Wight Blitzer,2,M,Mummies,2,L
+Skaven,Skaven Lineman,16,M,Skaven Thrower,2,M,Skaven Gutter Runner,4,M,Skaven Blitzer,2,M,Rat Ogre,1,L
+Slaanesh,Daemonettes,16,M,Slaangors,4,M,Slaanesh Warriors,4,M
+Slann,Lineman,16,M,Catcher,4,M,Blitzer,4,M,Kroxigor,1,L
+Snotlings,Snotling Linemen,16,S,Fungus Flinga,2,S,Fun-hoppa,2,S,Stilty Runna,2,S,Pump Wagon,2,L,Trained Troll,2,L
+Underworld Denizens,Underworld Goblin Linemen,12,S,Underworld Snotling,6,S,Skaven Clanrat,3,M,Skaven Thrower,1,M,Gutter Runner,1,M,Skaven Blitzer,1,M,Underworld Troll,1,L,Mutant Rat Ogre,1,L
+Vampires,Thrall Linemen,16,M,Vampire Thrower,2,M,Vampire Blitzer,2,M,Vampire Runner,2,M,Vargheist,1,M
+Wood Elf,Wood Elf Lineman,12,M,Wood Elf Thrower,2,M,Wood Elf Catcher,4,M,Wardancer,2,M,Loren Forest Treeman,1,L

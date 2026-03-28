@@ -11,7 +11,9 @@ from .helpers import (
     _safe_remove_object,
     _set_active,
     enum_previews_from_directory_items,
+    get_nurnie_anchor_state,
     preview_collections,
+    store_nurnie_anchor_state,
     unhidenurnieleft,
     unhidenurnieright,
 )
@@ -448,10 +450,11 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
         if not anchor:
             return {'CANCELLED'}
 
-        nurnie_x = anchor.location.x
-        nurnie_y = anchor.location.y
-        nurnie_z = anchor.location.z
-        nurnie_s = anchor.instance_faces_scale
+        anchor_state = get_nurnie_anchor_state(anchor)
+        nurnie_x = anchor_state["x"]
+        nurnie_y = anchor_state["y"]
+        nurnie_z = anchor_state["z"]
+        nurnie_s = anchor_state["scale"]
 
         wm = context.window_manager
         import_dir = wm.my_previews_dir
@@ -492,6 +495,7 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = nurnie_s
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
 
         if "NUR_LEFT" in bpy.data.objects:
             bpy.data.objects["NUR_LEFT"].hide_set(True)
@@ -517,10 +521,11 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
         if not anchor:
             return {'CANCELLED'}
 
-        nurnie_x = anchor.location.x
-        nurnie_y = anchor.location.y
-        nurnie_z = anchor.location.z
-        nurnie_s = anchor.instance_faces_scale
+        anchor_state = get_nurnie_anchor_state(anchor)
+        nurnie_x = anchor_state["x"]
+        nurnie_y = anchor_state["y"]
+        nurnie_z = anchor_state["z"]
+        nurnie_s = anchor_state["scale"]
 
         wm = context.window_manager
         import_dir = wm.my_previews_dir
@@ -561,6 +566,7 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = nurnie_s
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
 
         if "NUR_RIGHT" in bpy.data.objects:
             bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -615,6 +621,7 @@ class ADDNURNIELEFT_OT_my_op(Operator):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = float(bpy.context.scene.my_tool.my_user_z)
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
 
         if "NUR_LEFT" in bpy.data.objects:
             bpy.data.objects["NUR_LEFT"].hide_set(True)
@@ -669,6 +676,7 @@ class ADDNURNIERIGHT_OT_my_op(Operator):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = float(bpy.context.scene.my_tool.my_user_z)
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
 
         if "NUR_RIGHT" in bpy.data.objects:
             bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -744,11 +752,11 @@ def _mirror_nurnie(side):
         source_anchor = bpy.data.objects.get('NURNIE_LEFT')
         if not source_anchor:
             return {'CANCELLED'}
-
-        nurnie_x = -source_anchor.location.x
-        nurnie_y = source_anchor.location.y
-        nurnie_z = source_anchor.location.z
-        nurnie_s = source_anchor.instance_faces_scale
+        anchor_state = get_nurnie_anchor_state(source_anchor)
+        nurnie_x = -anchor_state["x"]
+        nurnie_y = anchor_state["y"]
+        nurnie_z = anchor_state["z"]
+        nurnie_s = anchor_state["scale"]
 
         unhidenurnieleft(None)
 
@@ -786,6 +794,7 @@ def _mirror_nurnie(side):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = nurnie_s
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
 
         bpy.data.objects["NUR_LEFT"].hide_set(True)
         bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -808,10 +817,11 @@ def _mirror_nurnie(side):
         _set_active(ob)
         ob.select_set(True)
 
-        nurnie_x = bpy.data.objects['NURNIE_RIGHT'].location.x
-        nurnie_y = bpy.data.objects['NURNIE_RIGHT'].location.y
-        nurnie_z = bpy.data.objects['NURNIE_RIGHT'].location.z
-        nurnie_s = bpy.data.objects['NURNIE_RIGHT'].instance_faces_scale
+        anchor_state = get_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
+        nurnie_x = anchor_state["x"]
+        nurnie_y = anchor_state["y"]
+        nurnie_z = anchor_state["z"]
+        nurnie_s = anchor_state["scale"]
 
         unhidenurnieright(None)
 
@@ -849,6 +859,7 @@ def _mirror_nurnie(side):
         bpy.context.object.use_instance_faces_scale = True
         bpy.context.object.instance_faces_scale = nurnie_s
         bpy.context.object.rotation_euler[0] = -0.261799
+        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
 
         bpy.data.objects["NUR_LEFT"].hide_set(True)
         bpy.data.objects["NUR_RIGHT"].hide_set(True)

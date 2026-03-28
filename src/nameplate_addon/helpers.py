@@ -414,6 +414,26 @@ NURNIE_CONFIG = {
 }
 
 
+def store_nurnie_anchor_state(obj):
+    if obj is None:
+        return
+    obj["nurnie_anchor_x"] = obj.location.x
+    obj["nurnie_anchor_y"] = obj.location.y
+    obj["nurnie_anchor_z"] = obj.location.z
+    obj["nurnie_scale"] = getattr(obj, "instance_faces_scale", 0.0)
+
+
+def get_nurnie_anchor_state(obj):
+    if obj is None:
+        return None
+    return {
+        "x": obj.get("nurnie_anchor_x", obj.location.x),
+        "y": obj.get("nurnie_anchor_y", obj.location.y),
+        "z": obj.get("nurnie_anchor_z", obj.location.z),
+        "scale": obj.get("nurnie_scale", getattr(obj, "instance_faces_scale", 0.0)),
+    }
+
+
 def get_locationZ(self):
     return self.get('locationZ', 0.0)
 

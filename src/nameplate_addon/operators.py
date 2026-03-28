@@ -6,6 +6,7 @@ from bpy.types import Operator
 from .constants import pi
 from .helpers import (
     NURNIE_CONFIG,
+    _get_base_curve_data,
     _deselect_all,
     _ensure_object_mode,
     _safe_remove_object,
@@ -22,6 +23,63 @@ from .plate import drawPlateTrue
 
 def selectBase(self, context):
     return
+
+
+def _get_nurnie_anchor_location(side, base_type, base_size_x, base_size_y):
+    side = str(side).upper()
+    user_z = int(bpy.context.scene.my_tool.my_user_z) * .5
+
+    if base_type == "S":
+        if side == "LEFT":
+            return (2, -base_size_y * .5 - .5, -user_z)
+        return (base_size_x - 2, -base_size_y * .5 - .5, -user_z)
+
+    if base_type == "L":
+        oval_choice = int(bpy.context.scene.my_tool.o_angles)
+        base_selected = _get_base_curve_data(f"L{base_size_x:03d}", oval_choice)
+        if base_selected:
+            total_length = base_selected[0]
+            center_offset = (base_size_x * pi) * .25
+            end_length = float(bpy.context.scene.my_tool.end_length)
+            if side == "LEFT":
+                anchor_x = center_offset - (total_length * .5) + (end_length * .5)
+            else:
+                anchor_x = center_offset + (total_length * .5) - (end_length * .5)
+            return (anchor_x, -1.5, user_z)
+
+    end_length = float(bpy.context.scene.my_tool.end_length)
+    center_offset = (base_size_x * pi) * .25
+
+    circle_curve = int(bpy.context.scene.my_tool.angles) * .01
+    if circle_curve == .41:
+        circle_curve = .415
+
+    total_length = (base_size_x * pi) * circle_curve
+
+    if side == "LEFT":
+        anchor_x = center_offset - (total_length * .5) + (end_length * .5)
+    else:
+        anchor_x = center_offset + (total_length * .5) - (end_length * .5)
+
+    return (anchor_x, -1.5, user_z)
+
+
+def _mirror_nurnie_plane_location(side, base_type, base_size_x, base_size_y, anchor_state):
+    side = str(side).upper()
+
+    if base_type == "S":
+        mirror_axis = base_size_x * .5
+    else:
+        mirror_axis = (base_size_x * pi) * .25
+
+    source_plane_x = anchor_state["plane_x"]
+    target_plane_x = (mirror_axis * 2.0) - source_plane_x
+
+    return (
+        target_plane_x,
+        anchor_state["plane_y"],
+        anchor_state["plane_z"],
+    )
 
 
 def drawFOV(self, context):
@@ -466,17 +524,12 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
         _safe_remove_object('NUR_LEFT')
         bpy.context.active_object.name = 'NUR_LEFT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=(2, -base_size_y * .5 - .5, 2))
-        else:
-            bpy.ops.mesh.primitive_plane_add(
-                enter_editmode=False, align='WORLD',
-                location=(((base_size_x * pi) * .25) - ((base_size_x * pi) * circle_curve * .5) + (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5)
-            )
+        anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
 
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
@@ -537,17 +590,12 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
         _safe_remove_object('NUR_RIGHT')
         bpy.context.active_object.name = 'NUR_RIGHT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=((base_size_x - 2, -base_size_y * .5 - .5, 2)))
-        else:
-            bpy.ops.mesh.primitive_plane_add(
-                enter_editmode=False, align='WORLD',
-                location=(((base_size_x * pi) * .25) + ((base_size_x * pi) * circle_curve * .5) - (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5)
-            )
+        anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
 
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
@@ -595,17 +643,12 @@ class ADDNURNIELEFT_OT_my_op(Operator):
         bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
         bpy.context.active_object.name = 'NUR_LEFT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=(2, -base_size_y * .5 - .5, 2))
-        else:
-            bpy.ops.mesh.primitive_plane_add(
-                enter_editmode=False, align='WORLD',
-                location=(((base_size_x * pi) * .25) - ((base_size_x * pi) * circle_curve * .5) + (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5)
-            )
+        anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
 
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
@@ -650,17 +693,12 @@ class ADDNURNIERIGHT_OT_my_op(Operator):
         bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
         bpy.context.active_object.name = 'NUR_RIGHT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=((base_size_x - 2, -base_size_y * .5 - .5, 2)))
-        else:
-            bpy.ops.mesh.primitive_plane_add(
-                enter_editmode=False, align='WORLD',
-                location=(((base_size_x * pi) * .25) + ((base_size_x * pi) * circle_curve * .5) - (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5)
-            )
+        anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
 
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
@@ -771,14 +809,12 @@ def _mirror_nurnie(side):
         bpy.ops.object.parent_clear(type='CLEAR')
         bpy.context.active_object.name = 'NUR_RIGHT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=((base_size_x - 2, -base_size_y * .5 - .5, 2)))
-        else:
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=(((base_size_x * pi) * .25) + ((base_size_x * pi) * circle_curve * .5) - (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5))
+        anchor_location = _mirror_nurnie_plane_location("RIGHT", base_type, base_size_x, base_size_y, anchor_state)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
         bpy.context.active_object.name = 'NURNIE_RIGHT'
@@ -838,14 +874,12 @@ def _mirror_nurnie(side):
         bpy.ops.object.parent_clear(type='CLEAR')
         bpy.context.active_object.name = 'NUR_LEFT'
 
-        circle_curve = int(bpy.context.scene.my_tool.angles) * .01
-        if circle_curve == .41:
-            circle_curve = .415
-
-        if base_type == "S":
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=(2, -base_size_y * .5 - .5, 2))
-        else:
-            bpy.ops.mesh.primitive_plane_add(enter_editmode=False, align='WORLD', location=(((base_size_x * pi) * .25) - ((base_size_x * pi) * circle_curve * .5) + (float(bpy.context.scene.my_tool.end_length) * .5), -1.5, int(bpy.context.scene.my_tool.my_user_z) * .5))
+        anchor_location = _mirror_nurnie_plane_location("LEFT", base_type, base_size_x, base_size_y, anchor_state)
+        bpy.ops.mesh.primitive_plane_add(
+            enter_editmode=False,
+            align='WORLD',
+            location=anchor_location
+        )
         bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
         bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
         bpy.context.active_object.name = 'NURNIE_LEFT'

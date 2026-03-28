@@ -421,6 +421,13 @@ def store_nurnie_anchor_state(obj):
     obj["nurnie_anchor_y"] = obj.location.y
     obj["nurnie_anchor_z"] = obj.location.z
     obj["nurnie_scale"] = getattr(obj, "instance_faces_scale", 0.0)
+    if getattr(obj, "type", "") == 'MESH' and getattr(obj, "data", None) and getattr(obj.data, "vertices", None):
+        verts = obj.data.vertices
+        count = len(verts)
+        if count:
+            obj["nurnie_plane_x"] = sum(v.co.x for v in verts) / count
+            obj["nurnie_plane_y"] = sum(v.co.y for v in verts) / count
+            obj["nurnie_plane_z"] = sum(v.co.z for v in verts) / count
 
 
 def get_nurnie_anchor_state(obj):
@@ -431,6 +438,9 @@ def get_nurnie_anchor_state(obj):
         "y": obj.get("nurnie_anchor_y", obj.location.y),
         "z": obj.get("nurnie_anchor_z", obj.location.z),
         "scale": obj.get("nurnie_scale", getattr(obj, "instance_faces_scale", 0.0)),
+        "plane_x": obj.get("nurnie_plane_x", 0.0),
+        "plane_y": obj.get("nurnie_plane_y", 0.0),
+        "plane_z": obj.get("nurnie_plane_z", 0.0),
     }
 
 

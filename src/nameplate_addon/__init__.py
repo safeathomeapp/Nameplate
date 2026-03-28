@@ -1,36 +1,27 @@
 bl_info = {
-    "name": "Nameplate Generator",
-    "author": "OpenAI Codex",
-    "version": (0, 1, 0),
+    "name": "NamePlate Generator",
+    "author": "Kev Thomas",
+    "version": (2, 0, 0),
     "blender": (5, 0, 0),
     "location": "View3D > Sidebar > Name Plate",
-    "description": "Foundation package for a procedural tabletop nameplate generator.",
+    "description": "Adds a new NamePlate Object with user defined properties",
+    "warning": "",
+    "wiki_url": "",
     "category": "3D View",
 }
 
-import bpy
-
-from . import operators, properties, ui
-
-CLASSES = (
-    properties.NameplateSettings,
-    operators.NAMEPLATE_OT_build_reference_objects,
-    operators.NAMEPLATE_OT_reset_reference_objects,
-    ui.NAMEPLATE_PT_main_panel,
-)
+from . import operators
+from . import properties
+from . import ui
 
 
 def register():
-    for cls in CLASSES:
-        bpy.utils.register_class(cls)
-
-    bpy.types.Scene.nameplate_settings = bpy.props.PointerProperty(
-        type=properties.NameplateSettings
-    )
+    properties.register()
+    operators.register()
+    ui.register()
 
 
 def unregister():
-    del bpy.types.Scene.nameplate_settings
-
-    for cls in reversed(CLASSES):
-        bpy.utils.unregister_class(cls)
+    ui.unregister()
+    operators.unregister()
+    properties.unregister()

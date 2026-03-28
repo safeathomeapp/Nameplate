@@ -1,434 +1,454 @@
-from __future__ import annotations
+import os
 
-import math
-from typing import Optional
-
+import bmesh
 import bpy
 from mathutils import Vector
 
-from .constants import (
-    BASE_PRESETS,
-    BASE_REFERENCE_HEIGHT_MM,
-    CURVED_BASE_FAMILIES,
-    DEFAULT_SETTINGS,
-    MANAGED_TAG,
-    MM_TO_SCENE_UNITS,
-    OBJECT_NAMES,
-    PLATE_BEND_MODIFIER_NAME,
-    PLATE_DEPTH_RATIO,
-    PLATE_LENGTH_RATIO,
-    PLATE_THICKNESS_MM,
-    REFERENCE_ROLES,
-    ROLE_TAG,
-)
+
+preview_collections = {}
+
+BASE_CURVE_DATA = {
+    "L060": ((30.3, 34.4), (44.1, 54.7), (51.7, 67.0)),
+    "L075": ((36.9, 33.0), (54.0, 51.0), (63.3, 63.3)),
+    "L090": ((45.5, 34.8), (65.8, 53.7), (77.4, 66.3)),
+    "L105": ((59.4, 46.3), (83.8, 67.9), (96.8, 81.3)),
+    "L120": ((76.1, 58.1), (105.0, 83.5), (120.0, 98.2)),
+    "L150": ((81.9, 41.7), (116.0, 62.6), (135.0, 76.1)),
+    "L170": ((87.5, 40.5), (125.0, 60.3), (145.0, 73.1)),
+}
+
+STYLE_BEVEL_SETTINGS = {
+    "BEVEL": {"offset": 1.85688, "segments": 10, "profile": 0.5},
+    "CHAMFER": {"offset": 1.0, "segments": 10, "profile": 0.1},
+    "SLANT": {"offset": 1.1, "segments": 1, "profile": 0.5},
+}
 
 
-def get_settings(context: bpy.types.Context) -> "bpy.types.PropertyGroup":
-    return context.scene.nameplate_settings
+def mm(val):
+    return val * 0.1
 
 
-def get_active_object_name(context: bpy.types.Context) -> str:
-    obj = context.active_object
-    return obj.name if obj else ""
+def set_active(obj):
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
 
 
-def scene_object(context: bpy.types.Context, key: str) -> Optional[bpy.types.Object]:
-    object_name = OBJECT_NAMES[key]
-    return context.scene.objects.get(object_name)
+def get_managed_objects():
+    return [o for o in bpy.data.objects if o.get("nameplate_managed")]
 
 
-def selected_base_preset(settings: bpy.types.PropertyGroup) -> str:
-    family = settings.base_family
-    return getattr(settings, f"base_preset_{family.lower()}")
+def delete_managed_objects():
+    for o in get_managed_objects():
+        bpy.data.objects.remove(o, do_unlink=True)
 
 
-def parse_base_preset_mm(settings: bpy.types.PropertyGroup) -> tuple[float, float]:
-    preset_id = selected_base_preset(settings)
-
-    if "x" in preset_id:
-        width_text, depth_text = preset_id.split("x", 1)
-        return float(width_text), float(depth_text.split("_", 1)[0])
-
-    value = float(preset_id.split("_", 1)[0])
-    return value, value
-
-
-def base_preset_label(settings: bpy.types.PropertyGroup) -> str:
-    preset_id = selected_base_preset(settings)
-    for item_id, label, _description in BASE_PRESETS[settings.base_family]:
-        if item_id == preset_id:
-            return label
-    return preset_id
+def _deselect_all():
+    try:
+        bpy.ops.object.select_all(action='DESELECT')
+    except Exception:
+        try:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.select_all(action='DESELECT')
+        except Exception:
+            pass
 
 
-def mm_to_scene_units(value_mm: float) -> float:
-    # Project convention: preset values are authored in millimeters, but the
-    # rewrite uses a 1:1 numeric mapping into Blender scene units for reference geometry.
-    return value_mm * MM_TO_SCENE_UNITS
+def _set_active(obj):
+    if obj is None:
+        return
+    try:
+        bpy.context.view_layer.objects.active = obj
+    except Exception:
+        try:
+            bpy.context.view_layer.objects.active = obj
+        except Exception:
+            pass
 
 
-def base_dimensions_m(settings: bpy.types.PropertyGroup) -> tuple[float, float]:
-    width_mm, depth_mm = parse_base_preset_mm(settings)
-    return mm_to_scene_units(width_mm), mm_to_scene_units(depth_mm)
+def _safe_remove_object(name: str):
+    obj = bpy.context.scene.objects.get(name)
+    if obj:
+        try:
+            bpy.data.objects.remove(obj, do_unlink=True)
+        except Exception:
+            pass
 
 
-def path_required(settings: bpy.types.PropertyGroup) -> bool:
-    return settings.base_family in CURVED_BASE_FAMILIES
-
-
-def is_managed_nameplate_object(obj: bpy.types.Object) -> bool:
-    return bool(obj.get(MANAGED_TAG))
-
-
-def object_role(obj: bpy.types.Object) -> str:
-    return str(obj.get(ROLE_TAG, ""))
-
-
-def managed_object_by_role(
-    context: bpy.types.Context, role: str
-) -> Optional[bpy.types.Object]:
-    canonical_name = next(
-        (name for name in OBJECT_NAMES.values() if name == role),
-        role,
-    )
-    obj = context.scene.objects.get(canonical_name)
-    if obj and is_managed_nameplate_object(obj):
-        return obj
-
-    for candidate in context.scene.objects:
-        if is_managed_nameplate_object(candidate) and object_role(candidate) == role:
-            return candidate
+def _get_view3d_area():
+    for area in getattr(bpy.context, "screen", None).areas if bpy.context.screen else []:
+        if area.type == 'VIEW_3D':
+            return area
     return None
 
 
-def list_managed_objects(context: bpy.types.Context) -> list[bpy.types.Object]:
-    managed = []
-    canonical_names = set(OBJECT_NAMES.values())
-    for obj in context.scene.objects:
-        if is_managed_nameplate_object(obj):
-            managed.append(obj)
-            continue
-        if obj.name in canonical_names and object_role(obj) in REFERENCE_ROLES:
-            managed.append(obj)
-    return managed
-
-
-def remove_object_data_if_unused(data) -> None:
-    if data is None or data.users > 0:
+def _set_random_viewport_color():
+    area = _get_view3d_area()
+    if not area:
         return
-
-    if isinstance(data, bpy.types.Mesh):
-        bpy.data.meshes.remove(data)
-    elif isinstance(data, bpy.types.Curve):
-        bpy.data.curves.remove(data)
-
-
-def delete_managed_objects(context: bpy.types.Context) -> list[str]:
-    removed_names = []
-    managed_objects = list_managed_objects(context)
-    for obj in managed_objects:
-        removed_names.append(obj.name)
-        data = obj.data
-        bpy.data.objects.remove(obj, do_unlink=True)
-        remove_object_data_if_unused(data)
-    return removed_names
+    for space in area.spaces:
+        if space.type == 'VIEW_3D':
+            try:
+                space.shading.color_type = 'RANDOM'
+            except Exception:
+                pass
 
 
-def ensure_collection_link(
-    context: bpy.types.Context, obj: bpy.types.Object
-) -> bpy.types.Object:
-    if context.scene.collection.objects.get(obj.name) is None:
-        context.scene.collection.objects.link(obj)
-    return obj
+def _find_top_face_index(obj):
+    if not obj or obj.type != 'MESH' or not obj.data.polygons:
+        return None
+    return max(
+        range(len(obj.data.polygons)),
+        key=lambda i: sum(obj.data.vertices[v].co.z for v in obj.data.polygons[i].vertices) / len(obj.data.polygons[i].vertices)
+    )
 
 
-def tag_managed_object(obj: bpy.types.Object, role: str) -> bpy.types.Object:
-    obj.name = role
-    obj[MANAGED_TAG] = True
-    obj[ROLE_TAG] = role
-    return obj
+def _inset_top_face(obj, scale_x, scale_y):
+    if not obj or obj.type != 'MESH':
+        return False
+
+    try:
+        _set_active(obj)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.mesh.select_mode(type='FACE')
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        top_index = _find_top_face_index(obj)
+        if top_index is None:
+            return False
+
+        obj.data.polygons[top_index].select = True
+
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.transform.resize(value=(scale_x, scale_y, 1), orient_type='GLOBAL')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        return True
+    except Exception:
+        _ensure_object_mode()
+        return False
 
 
-def create_empty_object(context: bpy.types.Context) -> bpy.types.Object:
-    empty = bpy.data.objects.new(OBJECT_NAMES["empty"], None)
-    ensure_collection_link(context, empty)
-    tag_managed_object(empty, "EMPTY")
-    empty.empty_display_type = "PLAIN_AXES"
-    empty.empty_display_size = mm_to_scene_units(5.0)
-    empty.location = (0.0, 0.0, 0.0)
-    return empty
+def _ensure_object_mode():
+    try:
+        if bpy.context.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+    except Exception:
+        pass
 
 
-def create_base_object(
-    context: bpy.types.Context, settings, parent: Optional[bpy.types.Object] = None
-) -> bpy.types.Object:
-    mesh = bpy.data.meshes.new("BASE_MESH")
-    base = bpy.data.objects.new(OBJECT_NAMES["base"], mesh)
-    ensure_collection_link(context, base)
-    tag_managed_object(base, "BASE")
-    base.location = (0.0, 0.0, 0.0)
-    base.parent = parent
-
-    width_m, depth_m = base_dimensions_m(settings)
-    verts, faces = build_base_mesh(settings.base_family, width_m, depth_m)
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-    return base
+def _halfscale(x, y, z):
+    return (x * 0.5, y * 0.5, z * 0.5)
 
 
-def create_path_object(
-    context: bpy.types.Context, settings, parent: Optional[bpy.types.Object] = None
-) -> Optional[bpy.types.Object]:
-    if not path_required(settings):
+def _get_style_bevel_settings(style):
+    return STYLE_BEVEL_SETTINGS.get(style)
+
+
+def _apply_bevel_to_bmesh_edges(bm, edges, style):
+    settings = _get_style_bevel_settings(style)
+    if not settings:
+        return False
+
+    valid_edges = [edge for edge in edges if edge is not None]
+    if not valid_edges:
+        return False
+
+    bmesh.ops.bevel(
+        bm,
+        geom=valid_edges,
+        affect='EDGES',
+        offset=settings["offset"],
+        offset_type='OFFSET',
+        segments=settings["segments"],
+        profile=settings["profile"],
+        clamp_overlap=True,
+    )
+    return True
+
+
+def _bevel_mesh_edges_by_index(obj, edge_indices, style):
+    if not obj or obj.type != 'MESH':
+        return False
+
+    mesh = obj.data
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        bm.edges.ensure_lookup_table()
+
+        edges = []
+        for edge_index in edge_indices:
+            if 0 <= edge_index < len(bm.edges):
+                edges.append(bm.edges[edge_index])
+
+        if not _apply_bevel_to_bmesh_edges(bm, edges, style):
+            return False
+
+        bm.to_mesh(mesh)
+        mesh.update()
+        return True
+    finally:
+        bm.free()
+
+
+def _get_base_curve_data(base_key, oval_choice):
+    base_selected = BASE_CURVE_DATA.get(base_key)
+    if base_selected is None:
+        return None
+    try:
+        return base_selected[int(oval_choice)]
+    except (IndexError, TypeError, ValueError):
         return None
 
-    curve = bpy.data.curves.new("PATH_CURVE", type="CURVE")
-    curve.dimensions = "3D"
-    spline = curve.splines.new("NURBS")
-    points = build_path_points(settings)
-    spline.points.add(len(points) - 1)
-    for index, point in enumerate(points):
-        spline.points[index].co = (point.x, point.y, point.z, 1.0)
-    spline.order_u = min(4, len(spline.points))
-    spline.use_endpoint_u = True
 
-    path = bpy.data.objects.new(OBJECT_NAMES["path"], curve)
-    ensure_collection_link(context, path)
-    tag_managed_object(path, "PATH")
-    path.location = (0.0, 0.0, 0.0)
-    path.parent = parent
-    return path
+def _find_outer_face_by_x(bm, sign):
+    if not bm.faces:
+        return None
+
+    def _face_center_x(face):
+        return sum(v.co.x for v in face.verts) / len(face.verts)
+
+    return max(bm.faces, key=_face_center_x) if sign > 0 else min(bm.faces, key=_face_center_x)
 
 
-def create_plate_object(
-    context: bpy.types.Context, settings, parent: Optional[bpy.types.Object] = None
-) -> bpy.types.Object:
-    mesh = bpy.data.meshes.new("PLATE_MESH")
-    plate = bpy.data.objects.new(OBJECT_NAMES["plate"], mesh)
-    ensure_collection_link(context, plate)
-    tag_managed_object(plate, "PLATE")
-    plate.location = (0.0, 0.0, 0.0)
-    plate.parent = parent
+def _get_end_cap_profile_edges(face):
+    if face is None:
+        return []
 
-    width_m, depth_m = base_dimensions_m(settings)
-    verts, faces = build_plate_mesh(settings, width_m, depth_m)
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-    if path_required(settings) and parent is not None:
-        configure_plate_bend_modifier(plate, parent, curved_plate_bend_angle(settings))
-    return plate
+    profile_edges = []
+    for edge in face.edges:
+        delta = edge.verts[1].co - edge.verts[0].co
+        abs_x = abs(delta.x)
+        abs_y = abs(delta.y)
+        abs_z = abs(delta.z)
 
+        if abs_y > abs_z and abs_y >= abs_x:
+            profile_edges.append(edge)
 
-def build_base_mesh(
-    base_family: str, width_m: float, depth_m: float
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    height_m = base_reference_height()
-    if base_family in {"CIRCLE", "OVAL", "SPECIAL"}:
-        return extruded_ellipse_mesh(width_m, depth_m, height_m, segments=48)
-    return extruded_rectangle_mesh(width_m, depth_m, height_m)
+    if len(profile_edges) == 2:
+        return profile_edges
 
-
-def extruded_rectangle_mesh(
-    width_m: float, depth_m: float, height_m: float, z_offset: float = 0.0
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    hx = width_m / 2.0
-    hy = depth_m / 2.0
-    z0 = z_offset
-    z1 = z_offset + height_m
-    verts = [
-        (-hx, -hy, z0),
-        (hx, -hy, z0),
-        (hx, hy, z0),
-        (-hx, hy, z0),
-        (-hx, -hy, z1),
-        (hx, -hy, z1),
-        (hx, hy, z1),
-        (-hx, hy, z1),
-    ]
-    faces = [
-        (0, 1, 2, 3),
-        (4, 7, 6, 5),
-        (0, 4, 5, 1),
-        (1, 5, 6, 2),
-        (2, 6, 7, 3),
-        (3, 7, 4, 0),
-    ]
-    return verts, faces
-
-
-def extruded_ellipse_mesh(
-    width_m: float, depth_m: float, height_m: float, segments: int
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    rx = width_m / 2.0
-    ry = depth_m / 2.0
-    bottom = []
-    top = []
-    for index in range(segments):
-        angle = (math.tau * index) / segments
-        x = math.cos(angle) * rx
-        y = math.sin(angle) * ry
-        bottom.append((x, y, 0.0))
-        top.append((x, y, height_m))
-
-    verts = bottom + top
-    faces = [tuple(range(segments))]
-    faces.append(tuple(range((segments * 2) - 1, segments - 1, -1)))
-    for index in range(segments):
-        next_index = (index + 1) % segments
-        faces.append(
-            (
-                index,
-                next_index,
-                segments + next_index,
-                segments + index,
-            )
-        )
-    return verts, faces
-
-
-def base_reference_height() -> float:
-    return mm_to_scene_units(BASE_REFERENCE_HEIGHT_MM)
-
-
-def plate_thickness() -> float:
-    return mm_to_scene_units(PLATE_THICKNESS_MM)
-
-
-def plate_band_depth(depth_m: float) -> float:
-    return max(mm_to_scene_units(8.0), depth_m * PLATE_DEPTH_RATIO)
-
-
-def plate_span_length(width_m: float) -> float:
-    return width_m * PLATE_LENGTH_RATIO
-
-
-def build_plate_mesh(
-    settings, width_m: float, depth_m: float
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    if path_required(settings):
-        return build_curved_plate_mesh(settings, width_m, depth_m)
-    return build_straight_plate_mesh(width_m, depth_m)
-
-
-def build_straight_plate_mesh(
-    width_m: float, depth_m: float
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    z0 = base_reference_height()
-    plate_width = plate_span_length(width_m)
-    plate_depth = plate_band_depth(depth_m)
-    return extruded_rectangle_mesh(
-        plate_width,
-        plate_depth,
-        plate_thickness(),
-        z_offset=z0,
+    face_edges = list(face.edges)
+    face_edges.sort(
+        key=lambda edge: abs(edge.verts[1].co.y - edge.verts[0].co.y),
+        reverse=True,
     )
+    return face_edges[:2]
 
 
-def build_curved_plate_mesh(
-    settings, width_m: float, depth_m: float
-) -> tuple[list[tuple[float, float, float]], list[tuple[int, ...]]]:
-    strip_length = curved_strip_length(settings, width_m, depth_m)
-    strip_depth = plate_band_depth(depth_m)
-    return extruded_rectangle_mesh(
-        strip_length,
-        strip_depth,
-        plate_thickness(),
-        z_offset=base_reference_height(),
-    )
+def _bevel_end_cap_profile(obj, sign, style):
+    if not obj or obj.type != 'MESH':
+        return False
+
+    mesh = obj.data
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        bm.faces.ensure_lookup_table()
+        bm.edges.ensure_lookup_table()
+
+        target_face = _find_outer_face_by_x(bm, sign)
+        profile_edges = _get_end_cap_profile_edges(target_face)
+        if not _apply_bevel_to_bmesh_edges(bm, profile_edges, style):
+            return False
+
+        bm.to_mesh(mesh)
+        mesh.update()
+        return True
+    finally:
+        bm.free()
 
 
-def build_path_points(settings) -> list[Vector]:
-    width_m, depth_m = base_dimensions_m(settings)
-
-    if settings.base_family in {"CIRCLE", "SPECIAL"}:
-        radius = max(width_m, depth_m) / 2.0
-        return arc_points(radius_x=radius, radius_y=radius, angle_degrees=120.0)
-
-    return arc_points(
-        radius_x=width_m / 2.0,
-        radius_y=depth_m / 2.0,
-        angle_degrees=120.0,
-    )
+def _world_co(obj, vert):
+    return obj.matrix_world @ vert.co
 
 
-def arc_points(radius_x: float, radius_y: float, angle_degrees: float) -> list[Vector]:
-    segments = 12
-    angle_radians = math.radians(angle_degrees)
-    start = (math.pi / 2.0) + (angle_radians / 2.0)
-    points = []
-    for index in range(segments + 1):
-        blend = index / segments
-        angle = start - (blend * angle_radians)
-        points.append(Vector((math.cos(angle) * radius_x, math.sin(angle) * radius_y, 0.0)))
-    return points
+def _find_outer_face_by_x_world(obj, bm, sign):
+    if not bm.faces:
+        return None
+
+    def _face_center_x_world(face):
+        coords = [_world_co(obj, vert) for vert in face.verts]
+        return sum(co.x for co in coords) / len(coords)
+
+    return max(bm.faces, key=_face_center_x_world) if sign > 0 else min(bm.faces, key=_face_center_x_world)
 
 
-def curve_tangent(points: list[Vector], index: int) -> Vector:
-    if index == 0:
-        tangent = points[1] - points[0]
-    elif index == len(points) - 1:
-        tangent = points[-1] - points[-2]
-    else:
-        tangent = points[index + 1] - points[index - 1]
-    return tangent.normalized() if tangent.length != 0.0 else Vector((1.0, 0.0, 0.0))
+def _get_top_face_profile_edge(obj, face):
+    if face is None:
+        return None
+
+    face_world = [_world_co(obj, vert) for vert in face.verts]
+    if not face_world:
+        return None
+
+    top_z = max(co.z for co in face_world)
+    z_tol = max(obj.dimensions.z, 1.0) * 1e-5
+
+    candidate_edges = []
+    for edge in face.edges:
+        v0 = _world_co(obj, edge.verts[0])
+        v1 = _world_co(obj, edge.verts[1])
+        delta = v1 - v0
+        abs_x = abs(delta.x)
+        abs_y = abs(delta.y)
+        abs_z = abs(delta.z)
+
+        if not (abs_y > abs_z and abs_y >= abs_x):
+            continue
+
+        edge_top_z = max(v0.z, v1.z)
+        both_top = abs(v0.z - top_z) <= z_tol and abs(v1.z - top_z) <= z_tol
+        edge_mid_z = (v0.z + v1.z) * 0.5
+        candidate_edges.append((both_top, edge_top_z, edge_mid_z, edge))
+
+    if not candidate_edges:
+        return None
+
+    candidate_edges.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    return candidate_edges[0][3]
 
 
-def curved_plate_arc_angle(settings) -> float:
-    width_mm, _depth_mm = parse_base_preset_mm(settings)
-    if settings.base_family == "OVAL":
-        if width_mm <= 75.0:
-            return 90.0
-        if width_mm <= 120.0:
-            return 120.0
-        return 135.0
+def _bevel_top_plate_profile(obj, style, drop_top_halfway=False):
+    if not obj or obj.type != 'MESH':
+        return False
 
-    if width_mm <= 40.0:
-        return 90.0
-    if width_mm <= 80.0:
-        return 120.0
-    if width_mm <= 130.0:
-        return 150.0
-    return 180.0
+    mesh = obj.data
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        bm.edges.ensure_lookup_table()
 
+        target_indices = [2, 8]
+        if drop_top_halfway:
+            target_indices.extend([0, 7])
 
-def curved_plate_bend_angle(settings) -> float:
-    return math.radians(curved_plate_arc_angle(settings))
+        target_edges = [
+            bm.edges[i] for i in target_indices
+            if 0 <= i < len(bm.edges)
+        ]
 
+        if not _apply_bevel_to_bmesh_edges(bm, target_edges, style):
+            return False
 
-def curved_plate_reference_radius(settings, width_m: float, depth_m: float) -> float:
-    if settings.base_family == "OVAL":
-        return width_m * 0.5
-    return max(width_m, depth_m) * 0.5
-
-
-def curved_strip_length(settings, width_m: float, depth_m: float) -> float:
-    radius = curved_plate_reference_radius(settings, width_m, depth_m)
-    return radius * curved_plate_bend_angle(settings)
+        bm.to_mesh(mesh)
+        mesh.update()
+        return True
+    finally:
+        bm.free()
 
 
-def configure_plate_bend_modifier(
-    plate: bpy.types.Object, anchor: bpy.types.Object, bend_angle: float
-) -> None:
-    bend = plate.modifiers.new(name=PLATE_BEND_MODIFIER_NAME, type="SIMPLE_DEFORM")
-    bend.deform_method = "BEND"
-    bend.deform_axis = "Z"
-    bend.origin = anchor
-    bend.angle = bend_angle
+def enum_previews_from_directory_items(self, context):
+    enum_items = []
+    if context is None:
+        return enum_items
+
+    wm = context.window_manager
+    directory = getattr(wm, "my_previews_dir", "")
+
+    pcoll = preview_collections.get("main")
+    if pcoll is None:
+        return enum_items
+
+    if directory == getattr(pcoll, "my_previews_dir", ""):
+        return getattr(pcoll, "my_previews", enum_items)
+
+    if directory and os.path.exists(directory):
+        image_paths = [fn for fn in os.listdir(directory) if fn.lower().endswith(".png")]
+        image_paths.sort()
+
+        for i, name in enumerate(image_paths):
+            filepath = os.path.join(directory, name)
+            try:
+                icon = pcoll.get(name)
+                if not icon:
+                    thumb = pcoll.load(name, filepath, 'IMAGE')
+                else:
+                    thumb = pcoll[name]
+                enum_items.append((name, name, "", thumb.icon_id, i))
+            except Exception:
+                enum_items.append((name, name, "", 'FILE_IMAGE', i))
+
+    pcoll.my_previews = enum_items
+    pcoll.my_previews_dir = directory
+    return getattr(pcoll, "my_previews", enum_items)
 
 
-def workflow_summary(settings: bpy.types.PropertyGroup) -> str:
-    return (
-        f"{settings.workflow_mode} | "
-        f"{settings.base_family}:{base_preset_label(settings)} | "
-        f"path={'yes' if path_required(settings) else 'no'}"
-    )
+def italicText(self, context):
+    obj = bpy.context.object
+    if not obj or obj.type != 'FONT':
+        return
+    try:
+        if bpy.context.scene.my_tool.it_bot_text:
+            obj.data.shear = 0.2
+        else:
+            obj.data.shear = 0.0
+    except Exception:
+        pass
 
 
-def tag_view_layer_for_update(context: bpy.types.Context) -> None:
-    if context.view_layer is not None:
-        context.view_layer.update()
+def unhidenurnieleft(_self=None):
+    obj = bpy.data.objects.get("NUR_LEFT")
+    if obj:
+        obj.hide_set(False)
 
 
-def reset_settings(settings: bpy.types.PropertyGroup) -> None:
-    for key, value in DEFAULT_SETTINGS.items():
-        setattr(settings, key, value)
+def unhidenurnieright(_self=None):
+    obj = bpy.data.objects.get("NUR_RIGHT")
+    if obj:
+        obj.hide_set(False)
+
+
+NURNIE_CONFIG = {
+    "LEFT": {
+        "nur": "NUR_LEFT",
+        "nurnie": "NURNIE_LEFT",
+        "unhide": unhidenurnieleft,
+    },
+    "RIGHT": {
+        "nur": "NUR_RIGHT",
+        "nurnie": "NURNIE_RIGHT",
+        "unhide": unhidenurnieright,
+    },
+}
+
+
+def get_locationZ(self):
+    return self.get('locationZ', 0.0)
+
+
+def set_locationZ(self, value):
+    z_axis = Vector((0, 1, 0))
+    delta = value - self.get('locationZ', 0.0)
+    v = (self.matrix_world.to_3x3() @ z_axis).normalized()
+    self.matrix_world.translation += delta * v
+    self['locationZ'] = float(value)
+
+
+def get_locationY(self):
+    return self.get('locationY', 0.0)
+
+
+def set_locationY(self, value):
+    y_axis = Vector((0, 0, 1))
+    delta = value - self.get('locationY', 0.0)
+    v = (self.matrix_world.to_3x3() @ y_axis).normalized()
+    self.matrix_world.translation += delta * v
+    self['locationY'] = float(value)
+
+
+def selectItem(self, context):
+    name = str(bpy.context.scene.my_tool.my_item)
+    menu = bpy.context.scene.objects.get(name)
+    if menu:
+        _deselect_all()
+        _set_active(menu)
+        menu.select_set(True)
+        return
+
+    default = bpy.context.scene.objects.get("BASE")
+    if default:
+        _deselect_all()
+        _set_active(default)
+        default.select_set(True)

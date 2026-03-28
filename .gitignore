@@ -1,1 +1,7 @@
 STLs/
+__pycache__/
+*.pyc
+*.pyo
+src/nameplate_addon.zip
+.DS_Store
+Thumbs.db

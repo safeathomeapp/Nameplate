@@ -752,6 +752,7 @@ def _mirror_nurnie(side):
         source_anchor = bpy.data.objects.get('NURNIE_LEFT')
         if not source_anchor:
             return {'CANCELLED'}
+        store_nurnie_anchor_state(source_anchor)
         anchor_state = get_nurnie_anchor_state(source_anchor)
         nurnie_x = -anchor_state["x"]
         nurnie_y = anchor_state["y"]
@@ -817,7 +818,9 @@ def _mirror_nurnie(side):
         _set_active(ob)
         ob.select_set(True)
 
-        anchor_state = get_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
+        source_anchor = bpy.data.objects['NURNIE_RIGHT']
+        store_nurnie_anchor_state(source_anchor)
+        anchor_state = get_nurnie_anchor_state(source_anchor)
         nurnie_x = anchor_state["x"]
         nurnie_y = anchor_state["y"]
         nurnie_z = anchor_state["z"]

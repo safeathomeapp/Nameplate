@@ -29,6 +29,8 @@ def mm(val):
 
 
 def set_active(obj):
+    # Selection-reset helper: use this only when deselecting everything first is required.
+    # This is NOT interchangeable with _set_active(); swapping them has already broken join flows.
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
@@ -55,6 +57,8 @@ def _deselect_all():
 
 
 def _set_active(obj):
+    # Legacy active-object helper: intentionally does not change the current selection set.
+    # Multi-object operators such as join rely on this preserving already-selected objects.
     if obj is None:
         return
     try:

@@ -26,6 +26,9 @@ def selectBase(self, context):
 
 
 def _get_nurnie_anchor_location(side, base_type, base_size_x, base_size_y):
+    # Suggested add/change anchor placement is base-type-specific.
+    # `L` bases must use the oval span data (`o_angles`) rather than the circle curve formula.
+    # Square Z placement is intentionally handled differently from curved bases to match legacy output.
     side = str(side).upper()
     user_z = int(bpy.context.scene.my_tool.my_user_z) * .5
 
@@ -80,6 +83,31 @@ def _mirror_nurnie_plane_location(side, base_type, base_size_x, base_size_y, anc
         anchor_state["plane_y"],
         anchor_state["plane_z"],
     )
+
+
+def _configure_nurnie_anchor(anchor_name, nur_name, scale_value):
+    # Keep this setup aligned with the legacy add/change/mirror order.
+    bpy.data.objects[nur_name].parent = bpy.data.objects[anchor_name]
+    bpy.ops.object.modifier_add(type='CURVE')
+    bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
+    bpy.context.object.instance_type = 'FACES'
+    bpy.context.object.show_instancer_for_render = False
+    bpy.context.object.show_instancer_for_viewport = False
+    bpy.context.object.use_instance_faces_scale = True
+    bpy.context.object.instance_faces_scale = scale_value
+    bpy.context.object.rotation_euler[0] = -0.261799
+    store_nurnie_anchor_state(bpy.data.objects[anchor_name])
+
+
+def _create_nurnie_anchor_plane(anchor_name, anchor_location):
+    bpy.ops.mesh.primitive_plane_add(
+        enter_editmode=False,
+        align='WORLD',
+        location=anchor_location
+    )
+    bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    bpy.context.active_object.name = anchor_name
 
 
 def drawFOV(self, context):
@@ -525,30 +553,12 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
         bpy.context.active_object.name = 'NUR_LEFT'
 
         anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
-
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_LEFT'
+        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
         bpy.context.object.location[0] = nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        bpy.data.objects['NUR_LEFT'].parent = bpy.data.objects['NURNIE_LEFT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
-        bpy.context.object.instance_type = 'FACES'
-
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = nurnie_s
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
+        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', nurnie_s)
 
         if "NUR_LEFT" in bpy.data.objects:
             bpy.data.objects["NUR_LEFT"].hide_set(True)
@@ -591,30 +601,12 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
         bpy.context.active_object.name = 'NUR_RIGHT'
 
         anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
-
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_RIGHT'
+        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
         bpy.context.object.location[0] = nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        bpy.data.objects['NUR_RIGHT'].parent = bpy.data.objects['NURNIE_RIGHT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
-        bpy.context.object.instance_type = 'FACES'
-
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = nurnie_s
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
+        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', nurnie_s)
 
         if "NUR_RIGHT" in bpy.data.objects:
             bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -644,27 +636,9 @@ class ADDNURNIELEFT_OT_my_op(Operator):
         bpy.context.active_object.name = 'NUR_LEFT'
 
         anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
+        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
 
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_LEFT'
-
-        bpy.data.objects['NUR_LEFT'].parent = bpy.data.objects['NURNIE_LEFT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
-        bpy.context.object.instance_type = 'FACES'
-
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = float(bpy.context.scene.my_tool.my_user_z)
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
+        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', float(bpy.context.scene.my_tool.my_user_z))
 
         if "NUR_LEFT" in bpy.data.objects:
             bpy.data.objects["NUR_LEFT"].hide_set(True)
@@ -694,27 +668,9 @@ class ADDNURNIERIGHT_OT_my_op(Operator):
         bpy.context.active_object.name = 'NUR_RIGHT'
 
         anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
+        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
 
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_RIGHT'
-
-        bpy.data.objects['NUR_RIGHT'].parent = bpy.data.objects['NURNIE_RIGHT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
-        bpy.context.object.instance_type = 'FACES'
-
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = float(bpy.context.scene.my_tool.my_user_z)
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
+        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', float(bpy.context.scene.my_tool.my_user_z))
 
         if "NUR_RIGHT" in bpy.data.objects:
             bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -773,6 +729,10 @@ def _delete_nurnie(side):
 
 
 def _mirror_nurnie(side):
+    # Mirror contract:
+    # - refresh and use the source anchor's stored plane basis plus its current live offset/scale
+    # - do not rebuild the target from a fresh suggested endcap position during cleanup/refactors
+    # - this preserves mirror behavior after plate resizes followed by manual nurnie repositioning
     _ensure_object_mode()
     base_obj = bpy.data.objects.get("BASE")
     if not base_obj:
@@ -810,28 +770,12 @@ def _mirror_nurnie(side):
         bpy.context.active_object.name = 'NUR_RIGHT'
 
         anchor_location = _mirror_nurnie_plane_location("RIGHT", base_type, base_size_x, base_size_y, anchor_state)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_RIGHT'
+        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
         bpy.context.object.location[0] = nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        bpy.data.objects['NUR_RIGHT'].parent = bpy.data.objects['NURNIE_RIGHT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects["PATH"]
-        bpy.context.object.instance_type = 'FACES'
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = nurnie_s
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_RIGHT'])
+        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', nurnie_s)
 
         bpy.data.objects["NUR_LEFT"].hide_set(True)
         bpy.data.objects["NUR_RIGHT"].hide_set(True)
@@ -875,28 +819,12 @@ def _mirror_nurnie(side):
         bpy.context.active_object.name = 'NUR_LEFT'
 
         anchor_location = _mirror_nurnie_plane_location("LEFT", base_type, base_size_x, base_size_y, anchor_state)
-        bpy.ops.mesh.primitive_plane_add(
-            enter_editmode=False,
-            align='WORLD',
-            location=anchor_location
-        )
-        bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-        bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
-        bpy.context.active_object.name = 'NURNIE_LEFT'
+        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
         bpy.context.object.location[0] = -nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        bpy.data.objects['NUR_LEFT'].parent = bpy.data.objects['NURNIE_LEFT']
-        bpy.ops.object.modifier_add(type='CURVE')
-        bpy.context.object.modifiers["Curve"].object = bpy.data.objects["PATH"]
-        bpy.context.object.instance_type = 'FACES'
-        bpy.context.object.show_instancer_for_render = False
-        bpy.context.object.show_instancer_for_viewport = False
-        bpy.context.object.use_instance_faces_scale = True
-        bpy.context.object.instance_faces_scale = nurnie_s
-        bpy.context.object.rotation_euler[0] = -0.261799
-        store_nurnie_anchor_state(bpy.data.objects['NURNIE_LEFT'])
+        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', nurnie_s)
 
         bpy.data.objects["NUR_LEFT"].hide_set(True)
         bpy.data.objects["NUR_RIGHT"].hide_set(True)

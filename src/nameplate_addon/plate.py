@@ -18,6 +18,10 @@ def drawPlate(self, context):
 
 
 def drawPlateTrue(self, context):
+    # Legacy geometry contract:
+    # - keep object names, selection flow, join order, and modifier order aligned with legacy behavior
+    # - base-type math here drives the produced plate shape and must not be "simplified" casually
+    # - selection-sensitive bpy.ops calls are part of the algorithm, not incidental cleanup targets
     _ensure_object_mode()
 
     def halfscale(x, y, z):

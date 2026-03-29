@@ -118,6 +118,63 @@ def _import_selected_nurnie(context, nur_name):
     bpy.context.active_object.name = nur_name
 
 
+def _get_base_dimensions():
+    base = bpy.data.objects.get("BASE")
+    if not base:
+        return None
+    return (
+        base,
+        base.data.name[:1],
+        int(base.data.name[1:4]),
+        int(base.data.name[4:7]),
+    )
+
+
+def _add_or_change_nurnie(context, side, preserve_anchor_state=False):
+    _ensure_object_mode()
+
+    base_info = _get_base_dimensions()
+    if not base_info:
+        return {'CANCELLED'}
+
+    _base, base_type, base_size_x, base_size_y = base_info
+    side = str(side).upper()
+    config = NURNIE_CONFIG.get(side)
+    if not config:
+        return {'CANCELLED'}
+
+    scale_value = float(bpy.context.scene.my_tool.my_user_z)
+    anchor_state = None
+
+    if preserve_anchor_state:
+        anchor = bpy.data.objects.get(config["nurnie"])
+        if not anchor:
+            return {'CANCELLED'}
+        store_nurnie_anchor_state(anchor)
+        anchor_state = get_nurnie_anchor_state(anchor)
+        scale_value = anchor_state["scale"]
+        _safe_remove_object(config["nurnie"])
+        _safe_remove_object(config["nur"])
+
+    _import_selected_nurnie(context, config["nur"])
+
+    anchor_location = _get_nurnie_anchor_location(side, base_type, base_size_x, base_size_y)
+    _create_nurnie_anchor_plane(config["nurnie"], anchor_location)
+
+    if anchor_state:
+        bpy.context.object.location[0] = anchor_state["x"]
+        bpy.context.object.location[1] = anchor_state["y"]
+        bpy.context.object.location[2] = anchor_state["z"]
+
+    _configure_nurnie_anchor(config["nurnie"], config["nur"], scale_value)
+
+    nur_obj = bpy.data.objects.get(config["nur"])
+    if nur_obj:
+        nur_obj.hide_set(True)
+
+    return {'FINISHED'}
+
+
 def drawFOV(self, context):
     _ensure_object_mode()
 
@@ -531,42 +588,7 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
     bl_idname = "changenurnieleft.myop_operator"
 
     def execute(self, context):
-        _ensure_object_mode()
-        base = bpy.data.objects.get("BASE")
-        if not base:
-            return {'CANCELLED'}
-
-        base_type = base.data.name[:1]
-        base_size_x = int(base.data.name[1:4])
-        base_size_y = int(base.data.name[4:7])
-
-        anchor = bpy.data.objects.get('NURNIE_LEFT')
-        if not anchor:
-            return {'CANCELLED'}
-
-        anchor_state = get_nurnie_anchor_state(anchor)
-        nurnie_x = anchor_state["x"]
-        nurnie_y = anchor_state["y"]
-        nurnie_z = anchor_state["z"]
-        nurnie_s = anchor_state["scale"]
-
-        _import_selected_nurnie(context, 'NUR_LEFT')
-
-        _safe_remove_object('NURNIE_LEFT')
-        _safe_remove_object('NUR_LEFT')
-
-        anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
-        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
-        bpy.context.object.location[0] = nurnie_x
-        bpy.context.object.location[1] = nurnie_y
-        bpy.context.object.location[2] = nurnie_z
-
-        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', nurnie_s)
-
-        if "NUR_LEFT" in bpy.data.objects:
-            bpy.data.objects["NUR_LEFT"].hide_set(True)
-
-        return {'FINISHED'}
+        return _add_or_change_nurnie(context, "LEFT", preserve_anchor_state=True)
 
 
 class CHANGENURNIERIGHT_OT_my_op(Operator):
@@ -574,42 +596,7 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
     bl_idname = "changenurnieright.myop_operator"
 
     def execute(self, context):
-        _ensure_object_mode()
-        base = bpy.data.objects.get("BASE")
-        if not base:
-            return {'CANCELLED'}
-
-        base_type = base.data.name[:1]
-        base_size_x = int(base.data.name[1:4])
-        base_size_y = int(base.data.name[4:7])
-
-        anchor = bpy.data.objects.get('NURNIE_RIGHT')
-        if not anchor:
-            return {'CANCELLED'}
-
-        anchor_state = get_nurnie_anchor_state(anchor)
-        nurnie_x = anchor_state["x"]
-        nurnie_y = anchor_state["y"]
-        nurnie_z = anchor_state["z"]
-        nurnie_s = anchor_state["scale"]
-
-        _import_selected_nurnie(context, 'NUR_RIGHT')
-
-        _safe_remove_object('NURNIE_RIGHT')
-        _safe_remove_object('NUR_RIGHT')
-
-        anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
-        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
-        bpy.context.object.location[0] = nurnie_x
-        bpy.context.object.location[1] = nurnie_y
-        bpy.context.object.location[2] = nurnie_z
-
-        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', nurnie_s)
-
-        if "NUR_RIGHT" in bpy.data.objects:
-            bpy.data.objects["NUR_RIGHT"].hide_set(True)
-
-        return {'FINISHED'}
+        return _add_or_change_nurnie(context, "RIGHT", preserve_anchor_state=True)
 
 
 class ADDNURNIELEFT_OT_my_op(Operator):
@@ -617,26 +604,7 @@ class ADDNURNIELEFT_OT_my_op(Operator):
     bl_idname = "addnurnieleft.myop_operator"
 
     def execute(self, context):
-        _ensure_object_mode()
-        base = bpy.data.objects.get("BASE")
-        if not base:
-            return {'CANCELLED'}
-
-        base_type = base.data.name[:1]
-        base_size_x = int(base.data.name[1:4])
-        base_size_y = int(base.data.name[4:7])
-
-        _import_selected_nurnie(context, 'NUR_LEFT')
-
-        anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
-        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
-
-        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', float(bpy.context.scene.my_tool.my_user_z))
-
-        if "NUR_LEFT" in bpy.data.objects:
-            bpy.data.objects["NUR_LEFT"].hide_set(True)
-
-        return {'FINISHED'}
+        return _add_or_change_nurnie(context, "LEFT", preserve_anchor_state=False)
 
 
 class ADDNURNIERIGHT_OT_my_op(Operator):
@@ -644,26 +612,7 @@ class ADDNURNIERIGHT_OT_my_op(Operator):
     bl_idname = "addnurnieright.myop_operator"
 
     def execute(self, context):
-        _ensure_object_mode()
-        base = bpy.data.objects.get("BASE")
-        if not base:
-            return {'CANCELLED'}
-
-        base_type = base.data.name[:1]
-        base_size_x = int(base.data.name[1:4])
-        base_size_y = int(base.data.name[4:7])
-
-        _import_selected_nurnie(context, 'NUR_RIGHT')
-
-        anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
-        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
-
-        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', float(bpy.context.scene.my_tool.my_user_z))
-
-        if "NUR_RIGHT" in bpy.data.objects:
-            bpy.data.objects["NUR_RIGHT"].hide_set(True)
-
-        return {'FINISHED'}
+        return _add_or_change_nurnie(context, "RIGHT", preserve_anchor_state=False)
 
 
 def _flip_nurnie(side):

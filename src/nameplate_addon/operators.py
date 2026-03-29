@@ -12,6 +12,7 @@ from .helpers import (
     _safe_remove_object,
     _set_active,
     enum_previews_from_directory_items,
+    get_managed_objects,
     get_nurnie_anchor_state,
     preview_collections,
     store_nurnie_anchor_state,
@@ -227,6 +228,32 @@ def drawFOV(self, context):
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
+
+
+def _clear_nameplate_objects():
+    legacy_names = (
+        "BASE",
+        "PATH",
+        "EMPTY",
+        "PLATE",
+        "FOV",
+        "MAINTEXT",
+        "UPPERTEXT",
+        "NURNIE_LEFT",
+        "NURNIE_RIGHT",
+        "NUR_LEFT",
+        "NUR_RIGHT",
+        "IMPORTPLATE",
+        "FOV1",
+        "FOV2",
+        "RIGHT_NURNIE",
+    )
+
+    managed_names = {obj.name for obj in get_managed_objects()}
+    target_names = managed_names.union(legacy_names)
+
+    for object_name in target_names:
+        _safe_remove_object(object_name)
 
 
 def SetNurnie(self, context):
@@ -518,11 +545,7 @@ class CLEARSCENE_OT_my_op(Operator):
             unhidenurnieleft(self)
         if 'NURNIE_RIGHT' in bpy.context.scene.objects:
             unhidenurnieright(self)
-        try:
-            bpy.ops.object.select_all(action='SELECT')
-            bpy.ops.object.delete(use_global=False)
-        except Exception:
-            pass
+        _clear_nameplate_objects()
         return {'FINISHED'}
 
 
@@ -798,15 +821,6 @@ class Getready_OT_my_op(Operator):
 
     def execute(self, context):
         _ensure_object_mode()
-
-        for nm in ('Cube', 'Camera', 'Light'):
-            if nm in bpy.context.scene.objects:
-                _deselect_all()
-                bpy.data.objects[nm].select_set(True)
-                try:
-                    bpy.ops.object.delete()
-                except Exception:
-                    pass
 
         base = bpy.data.objects.get("BASE")
         if not base:

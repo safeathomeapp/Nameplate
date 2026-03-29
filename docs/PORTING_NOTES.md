@@ -11,38 +11,6 @@ This is **not a rewrite**. It is a controlled refactor.
 
 ---
 
-## Key Changes So Far
-
-### Compatibility
-- Updated code to work with Blender 4.x / 5.x API changes
-- Removed deprecated constructs where required
-
-### Geometry Stability
-- Replaced fragile edge-index selection with geometric detection
-- Ensured bevel operations only affect intended edges
-- Preserved plate thickness and depth behaviour
-
-### Base Generation Fixes
-- Fixed square, oval, and special base types:
-  - Correct depth restored
-  - Correct bevel/inset behaviour restored
-  - Removed flat-plane bug
-
-### Top Plate
-- Rebuilt top plate drop logic
-- Removed broken legacy positioning code
-- Introduced controlled offset logic
-
-### Nurnie System
-- Refactored duplicated logic:
-  - Flip
-  - Delete
-  - Mirror
-- Introduced shared helper functions
-- Added `NURNIE_CONFIG` for side-based behaviour
-
----
-
 ## Design Rules
 
 These rules guide all changes:
@@ -67,8 +35,6 @@ These rules guide all changes:
 
 ## Known Fragile Areas
 
-- Curve/path-based positioning
-- Mirror logic on curved bases
 - Context-sensitive `bpy.ops` usage
 - Legacy naming and structure
 
@@ -76,7 +42,6 @@ These rules guide all changes:
 
 ## Future Work
 
-- Stabilize mirror behaviour on curved plates
 - Continue removing duplicated left/right logic
 - Improve naming consistency
 - Gradually replace `bpy.ops` with safer data-level operations

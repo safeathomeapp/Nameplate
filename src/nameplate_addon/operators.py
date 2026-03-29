@@ -110,6 +110,14 @@ def _create_nurnie_anchor_plane(anchor_name, anchor_location):
     bpy.context.active_object.name = anchor_name
 
 
+def _import_selected_nurnie(context, nur_name):
+    wm = context.window_manager
+    import_dir = wm.my_previews_dir
+    import_file = bpy.data.window_managers["WinMan"].my_previews[:-4]
+    bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
+    bpy.context.active_object.name = nur_name
+
+
 def drawFOV(self, context):
     _ensure_object_mode()
 
@@ -542,15 +550,10 @@ class CHANGENURNIELEFT_OT_my_op(Operator):
         nurnie_z = anchor_state["z"]
         nurnie_s = anchor_state["scale"]
 
-        wm = context.window_manager
-        import_dir = wm.my_previews_dir
-        import_file = bpy.data.window_managers["WinMan"].my_previews[:-4]
-
-        bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
+        _import_selected_nurnie(context, 'NUR_LEFT')
 
         _safe_remove_object('NURNIE_LEFT')
         _safe_remove_object('NUR_LEFT')
-        bpy.context.active_object.name = 'NUR_LEFT'
 
         anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
         _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
@@ -590,15 +593,10 @@ class CHANGENURNIERIGHT_OT_my_op(Operator):
         nurnie_z = anchor_state["z"]
         nurnie_s = anchor_state["scale"]
 
-        wm = context.window_manager
-        import_dir = wm.my_previews_dir
-        import_file = bpy.data.window_managers["WinMan"].my_previews[:-4]
-
-        bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
+        _import_selected_nurnie(context, 'NUR_RIGHT')
 
         _safe_remove_object('NURNIE_RIGHT')
         _safe_remove_object('NUR_RIGHT')
-        bpy.context.active_object.name = 'NUR_RIGHT'
 
         anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
         _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
@@ -628,12 +626,7 @@ class ADDNURNIELEFT_OT_my_op(Operator):
         base_size_x = int(base.data.name[1:4])
         base_size_y = int(base.data.name[4:7])
 
-        wm = context.window_manager
-        import_dir = wm.my_previews_dir
-        import_file = bpy.data.window_managers["WinMan"].my_previews[:-4]
-
-        bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
-        bpy.context.active_object.name = 'NUR_LEFT'
+        _import_selected_nurnie(context, 'NUR_LEFT')
 
         anchor_location = _get_nurnie_anchor_location("LEFT", base_type, base_size_x, base_size_y)
         _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
@@ -660,12 +653,7 @@ class ADDNURNIERIGHT_OT_my_op(Operator):
         base_size_x = int(base.data.name[1:4])
         base_size_y = int(base.data.name[4:7])
 
-        wm = context.window_manager
-        import_dir = wm.my_previews_dir
-        import_file = bpy.data.window_managers["WinMan"].my_previews[:-4]
-
-        bpy.ops.wm.stl_import(filepath=os.path.join(import_dir, import_file + ".stl"))
-        bpy.context.active_object.name = 'NUR_RIGHT'
+        _import_selected_nurnie(context, 'NUR_RIGHT')
 
         anchor_location = _get_nurnie_anchor_location("RIGHT", base_type, base_size_x, base_size_y)
         _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)

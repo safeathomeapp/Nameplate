@@ -381,7 +381,7 @@ class Export_STL_Custom(Operator):
             try:
                 bpy.ops.object.modifier_add(type='BOOLEAN')
                 bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
-                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[FOV_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:
@@ -404,7 +404,7 @@ class Export_STL_Custom(Operator):
             try:
                 bpy.ops.object.modifier_add(type='BOOLEAN')
                 bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
-                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[MAIN_TEXT_BOOL_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:
@@ -428,7 +428,7 @@ class Export_STL_Custom(Operator):
             try:
                 bpy.ops.object.modifier_add(type='BOOLEAN')
                 bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
-                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[UPPER_TEXT_BOOL_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:

@@ -8,7 +8,11 @@ from .constants import (
     EMPTY_OBJECT,
     FOV_OBJECT,
     IMPORT_PLATE_OBJECT,
+    LEFT_NUR_DUPLICATE_OBJECT,
     LEFT_NUR_EXPORT_OBJECT,
+    LEFT_NUR_OBJECT,
+    LEFT_NURNIE_DUPLICATE_OBJECT,
+    LEFT_NURNIE_OBJECT,
     MAIN_TEXT_OBJECT,
     MAIN_TEXT_BOOL_OBJECT,
     NAMEPLATE_LEGACY_OBJECTS,
@@ -17,7 +21,12 @@ from .constants import (
     PLATE_FOV_BOOLEAN_MODIFIER,
     PLATE_MAIN_TEXT_BOOLEAN_MODIFIER,
     PLATE_UPPER_TEXT_BOOLEAN_MODIFIER,
+    REALIZED_RIGHT_NURNIE_OBJECT,
+    RIGHT_NUR_DUPLICATE_OBJECT,
     RIGHT_NUR_EXPORT_OBJECT,
+    RIGHT_NUR_OBJECT,
+    RIGHT_NURNIE_DUPLICATE_OBJECT,
+    RIGHT_NURNIE_OBJECT,
     UPPER_TEXT_OBJECT,
     UPPER_TEXT_BOOL_OBJECT,
     pi,
@@ -259,15 +268,15 @@ def _clear_nameplate_objects():
 def SetNurnie(self, context):
     _ensure_object_mode()
 
-    if 'NURNIE_LEFT' in bpy.context.scene.objects:
-        ob = bpy.context.scene.objects["NURNIE_LEFT"]
+    if LEFT_NURNIE_OBJECT in bpy.context.scene.objects:
+        ob = bpy.context.scene.objects[LEFT_NURNIE_OBJECT]
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
 
         unhidenurnieleft(self)
 
-        ob2 = bpy.context.scene.objects.get("NUR_LEFT")
+        ob2 = bpy.context.scene.objects.get(LEFT_NUR_OBJECT)
         if ob2:
             _set_active(ob2)
             ob2.select_set(True)
@@ -278,22 +287,22 @@ def SetNurnie(self, context):
         except Exception:
             pass
 
-        for n in ('NURNIE_LEFT.001', 'NUR_LEFT.001'):
+        for n in (LEFT_NURNIE_DUPLICATE_OBJECT, LEFT_NUR_DUPLICATE_OBJECT):
             if n in bpy.data.objects:
                 bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
-        if "NUR_LEFT" in bpy.data.objects:
-            bpy.data.objects["NUR_LEFT"].hide_set(True)
+        if LEFT_NUR_OBJECT in bpy.data.objects:
+            bpy.data.objects[LEFT_NUR_OBJECT].hide_set(True)
 
-    if 'NURNIE_RIGHT' in bpy.context.scene.objects:
-        ob = bpy.context.scene.objects["NURNIE_RIGHT"]
+    if RIGHT_NURNIE_OBJECT in bpy.context.scene.objects:
+        ob = bpy.context.scene.objects[RIGHT_NURNIE_OBJECT]
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
 
         unhidenurnieright(self)
 
-        ob2 = bpy.context.scene.objects.get("NUR_RIGHT")
+        ob2 = bpy.context.scene.objects.get(RIGHT_NUR_OBJECT)
         if ob2:
             _set_active(ob2)
             ob2.select_set(True)
@@ -304,12 +313,12 @@ def SetNurnie(self, context):
         except Exception:
             pass
 
-        for n in ('NURNIE_RIGHT.001', 'NUR_RIGHT.001'):
+        for n in (RIGHT_NURNIE_DUPLICATE_OBJECT, RIGHT_NUR_DUPLICATE_OBJECT):
             if n in bpy.data.objects:
                 bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
-        if "NUR_RIGHT" in bpy.data.objects:
-            bpy.data.objects["NUR_RIGHT"].hide_set(True)
+        if RIGHT_NUR_OBJECT in bpy.data.objects:
+            bpy.data.objects[RIGHT_NUR_OBJECT].hide_set(True)
 
 
 class Import_STL_Custom(Operator):
@@ -536,9 +545,9 @@ class CLEARSCENE_OT_my_op(Operator):
 
     def execute(self, context):
         _ensure_object_mode()
-        if 'NURNIE_LEFT' in bpy.context.scene.objects:
+        if LEFT_NURNIE_OBJECT in bpy.context.scene.objects:
             unhidenurnieleft(self)
-        if 'NURNIE_RIGHT' in bpy.context.scene.objects:
+        if RIGHT_NURNIE_OBJECT in bpy.context.scene.objects:
             unhidenurnieright(self)
         _clear_nameplate_objects()
         return {'FINISHED'}
@@ -555,14 +564,14 @@ class SETNURNIERIGHT_OT_my_op(Operator):
         except Exception:
             pass
 
-        ob = bpy.context.scene.objects.get("NUR_RIGHT.001")
+        ob = bpy.context.scene.objects.get(RIGHT_NUR_DUPLICATE_OBJECT)
         if ob:
             _deselect_all()
             _set_active(ob)
             ob.select_set(True)
-            bpy.context.active_object.name = 'RIGHT_NURNIE'
+            bpy.context.active_object.name = REALIZED_RIGHT_NURNIE_OBJECT
 
-        for n in ('NURNIE_RIGHT', 'NUR_RIGHT'):
+        for n in (RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT):
             if n in bpy.context.scene.objects:
                 bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
@@ -699,10 +708,10 @@ def _mirror_nurnie(side):
     side = str(side).upper()
 
     if side == 'LEFT':
-        _safe_remove_object('NURNIE_RIGHT')
-        _safe_remove_object('NUR_RIGHT')
+        _safe_remove_object(RIGHT_NURNIE_OBJECT)
+        _safe_remove_object(RIGHT_NUR_OBJECT)
 
-        source_anchor = bpy.data.objects.get('NURNIE_LEFT')
+        source_anchor = bpy.data.objects.get(LEFT_NURNIE_OBJECT)
         if not source_anchor:
             return {'CANCELLED'}
         store_nurnie_anchor_state(source_anchor)
@@ -714,7 +723,7 @@ def _mirror_nurnie(side):
 
         unhidenurnieleft(None)
 
-        ob = bpy.context.scene.objects.get("NUR_LEFT")
+        ob = bpy.context.scene.objects.get(LEFT_NUR_OBJECT)
         if not ob:
             return {'CANCELLED'}
         _deselect_all()
@@ -722,20 +731,20 @@ def _mirror_nurnie(side):
         ob.select_set(True)
         bpy.ops.object.duplicate()
         bpy.ops.object.parent_clear(type='CLEAR')
-        bpy.context.active_object.name = 'NUR_RIGHT'
+        bpy.context.active_object.name = RIGHT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("RIGHT", base_type, base_size_x, base_size_y, anchor_state)
-        _create_nurnie_anchor_plane('NURNIE_RIGHT', anchor_location)
+        _create_nurnie_anchor_plane(RIGHT_NURNIE_OBJECT, anchor_location)
         bpy.context.object.location[0] = nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        _configure_nurnie_anchor('NURNIE_RIGHT', 'NUR_RIGHT', nurnie_s)
+        _configure_nurnie_anchor(RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT, nurnie_s)
 
-        bpy.data.objects["NUR_LEFT"].hide_set(True)
-        bpy.data.objects["NUR_RIGHT"].hide_set(True)
+        bpy.data.objects[LEFT_NUR_OBJECT].hide_set(True)
+        bpy.data.objects[RIGHT_NUR_OBJECT].hide_set(True)
 
-        ob = bpy.context.scene.objects.get("NURNIE_LEFT")
+        ob = bpy.context.scene.objects.get(LEFT_NURNIE_OBJECT)
         if ob:
             _deselect_all()
             _set_active(ob)
@@ -743,17 +752,17 @@ def _mirror_nurnie(side):
         return {'FINISHED'}
 
     if side == 'RIGHT':
-        _safe_remove_object('NURNIE_LEFT')
-        _safe_remove_object('NUR_LEFT')
+        _safe_remove_object(LEFT_NURNIE_OBJECT)
+        _safe_remove_object(LEFT_NUR_OBJECT)
 
-        ob = bpy.context.scene.objects.get("NURNIE_RIGHT")
+        ob = bpy.context.scene.objects.get(RIGHT_NURNIE_OBJECT)
         if not ob:
             return {'CANCELLED'}
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
 
-        source_anchor = bpy.data.objects['NURNIE_RIGHT']
+        source_anchor = bpy.data.objects[RIGHT_NURNIE_OBJECT]
         store_nurnie_anchor_state(source_anchor)
         anchor_state = get_nurnie_anchor_state(source_anchor)
         nurnie_x = anchor_state["x"]
@@ -763,7 +772,7 @@ def _mirror_nurnie(side):
 
         unhidenurnieright(None)
 
-        ob = bpy.context.scene.objects.get("NUR_RIGHT")
+        ob = bpy.context.scene.objects.get(RIGHT_NUR_OBJECT)
         if not ob:
             return {'CANCELLED'}
         _deselect_all()
@@ -771,20 +780,20 @@ def _mirror_nurnie(side):
         ob.select_set(True)
         bpy.ops.object.duplicate()
         bpy.ops.object.parent_clear(type='CLEAR')
-        bpy.context.active_object.name = 'NUR_LEFT'
+        bpy.context.active_object.name = LEFT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("LEFT", base_type, base_size_x, base_size_y, anchor_state)
-        _create_nurnie_anchor_plane('NURNIE_LEFT', anchor_location)
+        _create_nurnie_anchor_plane(LEFT_NURNIE_OBJECT, anchor_location)
         bpy.context.object.location[0] = -nurnie_x
         bpy.context.object.location[1] = nurnie_y
         bpy.context.object.location[2] = nurnie_z
 
-        _configure_nurnie_anchor('NURNIE_LEFT', 'NUR_LEFT', nurnie_s)
+        _configure_nurnie_anchor(LEFT_NURNIE_OBJECT, LEFT_NUR_OBJECT, nurnie_s)
 
-        bpy.data.objects["NUR_LEFT"].hide_set(True)
-        bpy.data.objects["NUR_RIGHT"].hide_set(True)
+        bpy.data.objects[LEFT_NUR_OBJECT].hide_set(True)
+        bpy.data.objects[RIGHT_NUR_OBJECT].hide_set(True)
 
-        ob = bpy.context.scene.objects.get("NURNIE_RIGHT")
+        ob = bpy.context.scene.objects.get(RIGHT_NURNIE_OBJECT)
         if ob:
             _deselect_all()
             _set_active(ob)

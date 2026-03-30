@@ -359,6 +359,12 @@ def ShowMessageBox(message="", title="", icon='INFO'):
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
 
+def _report_operator_error(message, exc):
+    detail = f"{message}: {exc}"
+    print(detail)
+    ShowMessageBox(detail[:180], "Nameplate Export Warning", 'ERROR')
+
+
 class Export_STL_Custom(Operator):
     bl_idname = "object.export_stl_custom"
     bl_label = "Export STL Custom"
@@ -388,8 +394,9 @@ class Export_STL_Custom(Operator):
                 if mod_name in plate.modifiers:
                     try:
                         bpy.ops.object.modifier_apply(modifier=mod_name)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _report_operator_error(f"Failed to apply modifier '{mod_name}'", exc)
+                        return {"CANCELLED"}
 
         if 'FOV' in bpy.context.scene.objects:
             _deselect_all()
@@ -401,8 +408,9 @@ class Export_STL_Custom(Operator):
                 bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[FOV_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
-            except Exception:
-                pass
+            except Exception as exc:
+                _report_operator_error("Failed to apply FOV boolean", exc)
+                return {"CANCELLED"}
             _safe_remove_object(FOV_OBJECT)
 
         select_main = MAIN_TEXT_OBJECT
@@ -424,8 +432,9 @@ class Export_STL_Custom(Operator):
                 bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[MAIN_TEXT_BOOL_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
-            except Exception:
-                pass
+            except Exception as exc:
+                _report_operator_error("Failed to apply main text boolean", exc)
+                return {"CANCELLED"}
             _safe_remove_object(MAIN_TEXT_BOOL_OBJECT)
             select_main = ""
 
@@ -448,8 +457,9 @@ class Export_STL_Custom(Operator):
                 bpy.context.object.modifiers["Boolean"].solver = 'MANIFOLD'
                 bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[UPPER_TEXT_BOOL_OBJECT]
                 bpy.ops.object.modifier_apply(modifier="Boolean")
-            except Exception:
-                pass
+            except Exception as exc:
+                _report_operator_error("Failed to apply upper text boolean", exc)
+                return {"CANCELLED"}
             _safe_remove_object(UPPER_TEXT_BOOL_OBJECT)
             select_upper = ""
 
@@ -463,11 +473,16 @@ class Export_STL_Custom(Operator):
                 bpy.ops.wm.stl_export(filepath=self.filepath, export_selected_objects=True, apply_modifiers=True, check_existing=True)
             else:
                 bpy.ops.wm.stl_export(filepath=self.filepath + ".stl", export_selected_objects=True, apply_modifiers=True, check_existing=True)
-        except Exception:
-            if self.filepath.lower().endswith('.stl'):
-                bpy.ops.export_mesh.stl(filepath=self.filepath, use_selection=True, check_existing=True, use_mesh_modifiers=True)
-            else:
-                bpy.ops.export_mesh.stl(filepath=self.filepath + ".stl", use_selection=True, check_existing=True, use_mesh_modifiers=True)
+        except Exception as exc:
+            print(f"wm.stl_export failed, trying legacy export_mesh.stl fallback: {exc}")
+            try:
+                if self.filepath.lower().endswith('.stl'):
+                    bpy.ops.export_mesh.stl(filepath=self.filepath, use_selection=True, check_existing=True, use_mesh_modifiers=True)
+                else:
+                    bpy.ops.export_mesh.stl(filepath=self.filepath + ".stl", use_selection=True, check_existing=True, use_mesh_modifiers=True)
+            except Exception as fallback_exc:
+                _report_operator_error("Both STL export operators failed", fallback_exc)
+                return {"CANCELLED"}
 
         for n in (LEFT_NUR_EXPORT_OBJECT, RIGHT_NUR_EXPORT_OBJECT):
             if n in bpy.context.scene.objects:

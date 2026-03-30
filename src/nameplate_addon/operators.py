@@ -146,6 +146,47 @@ def _import_selected_nurnie(context, nur_name):
     bpy.context.active_object.name = nur_name
 
 
+def _prepare_nurnie_for_export(side, unhide_fn):
+    # Export-prep contract:
+    # - duplicate the current instanced side, make it real, remove the temporary .001 pair
+    # - keep source anchor/source names intact so later mirror and edit flows do not drift
+    # - this helper is for export realization only; it must not change placement logic
+    config = NURNIE_CONFIG.get(str(side).upper())
+    if not config:
+        return
+
+    duplicate_anchor_name = LEFT_NURNIE_DUPLICATE_OBJECT if side == "LEFT" else RIGHT_NURNIE_DUPLICATE_OBJECT
+    duplicate_nur_name = LEFT_NUR_DUPLICATE_OBJECT if side == "LEFT" else RIGHT_NUR_DUPLICATE_OBJECT
+
+    anchor_obj = bpy.context.scene.objects.get(config["nurnie"])
+    if not anchor_obj:
+        return
+
+    _deselect_all()
+    _set_active(anchor_obj)
+    anchor_obj.select_set(True)
+
+    unhide_fn(None)
+
+    source_obj = bpy.context.scene.objects.get(config["nur"])
+    if source_obj:
+        _set_active(source_obj)
+        source_obj.select_set(True)
+
+    try:
+        bpy.ops.object.duplicate()
+        bpy.ops.object.duplicates_make_real()
+    except Exception:
+        pass
+
+    for object_name in (duplicate_anchor_name, duplicate_nur_name):
+        if object_name in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[object_name], do_unlink=True)
+
+    if config["nur"] in bpy.data.objects:
+        bpy.data.objects[config["nur"]].hide_set(True)
+
+
 def _get_base_dimensions():
     base = bpy.data.objects.get(BASE_OBJECT)
     if not base:
@@ -267,58 +308,8 @@ def _clear_nameplate_objects():
 
 def SetNurnie(self, context):
     _ensure_object_mode()
-
-    if LEFT_NURNIE_OBJECT in bpy.context.scene.objects:
-        ob = bpy.context.scene.objects[LEFT_NURNIE_OBJECT]
-        _deselect_all()
-        _set_active(ob)
-        ob.select_set(True)
-
-        unhidenurnieleft(self)
-
-        ob2 = bpy.context.scene.objects.get(LEFT_NUR_OBJECT)
-        if ob2:
-            _set_active(ob2)
-            ob2.select_set(True)
-
-        try:
-            bpy.ops.object.duplicate()
-            bpy.ops.object.duplicates_make_real()
-        except Exception:
-            pass
-
-        for n in (LEFT_NURNIE_DUPLICATE_OBJECT, LEFT_NUR_DUPLICATE_OBJECT):
-            if n in bpy.data.objects:
-                bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
-
-        if LEFT_NUR_OBJECT in bpy.data.objects:
-            bpy.data.objects[LEFT_NUR_OBJECT].hide_set(True)
-
-    if RIGHT_NURNIE_OBJECT in bpy.context.scene.objects:
-        ob = bpy.context.scene.objects[RIGHT_NURNIE_OBJECT]
-        _deselect_all()
-        _set_active(ob)
-        ob.select_set(True)
-
-        unhidenurnieright(self)
-
-        ob2 = bpy.context.scene.objects.get(RIGHT_NUR_OBJECT)
-        if ob2:
-            _set_active(ob2)
-            ob2.select_set(True)
-
-        try:
-            bpy.ops.object.duplicate()
-            bpy.ops.object.duplicates_make_real()
-        except Exception:
-            pass
-
-        for n in (RIGHT_NURNIE_DUPLICATE_OBJECT, RIGHT_NUR_DUPLICATE_OBJECT):
-            if n in bpy.data.objects:
-                bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
-
-        if RIGHT_NUR_OBJECT in bpy.data.objects:
-            bpy.data.objects[RIGHT_NUR_OBJECT].hide_set(True)
+    _prepare_nurnie_for_export("LEFT", unhidenurnieleft)
+    _prepare_nurnie_for_export("RIGHT", unhidenurnieright)
 
 
 class Import_STL_Custom(Operator):

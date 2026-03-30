@@ -8,11 +8,18 @@ from .constants import (
     EMPTY_OBJECT,
     FOV_OBJECT,
     IMPORT_PLATE_OBJECT,
+    LEFT_NUR_EXPORT_OBJECT,
     MAIN_TEXT_OBJECT,
+    MAIN_TEXT_BOOL_OBJECT,
     NAMEPLATE_LEGACY_OBJECTS,
     PATH_OBJECT,
     PLATE_OBJECT,
+    PLATE_FOV_BOOLEAN_MODIFIER,
+    PLATE_MAIN_TEXT_BOOLEAN_MODIFIER,
+    PLATE_UPPER_TEXT_BOOLEAN_MODIFIER,
+    RIGHT_NUR_EXPORT_OBJECT,
     UPPER_TEXT_OBJECT,
+    UPPER_TEXT_BOOL_OBJECT,
     pi,
 )
 from .helpers import (
@@ -360,13 +367,7 @@ class Export_STL_Custom(Operator):
         plate.select_set(True)
 
         if plate.modifiers:
-            try:
-                dec = plate.modifiers.new(name="Decimate", type='DECIMATE')
-                dec.ratio = 0.01
-            except Exception:
-                pass
-
-            for mod_name in ("Remesh", "SimpleDeform", "Decimate"):
+            for mod_name in ("Remesh", "SimpleDeform"):
                 if mod_name in plate.modifiers:
                     try:
                         bpy.ops.object.modifier_apply(modifier=mod_name)
@@ -374,12 +375,15 @@ class Export_STL_Custom(Operator):
                         pass
 
         if 'FOV' in bpy.context.scene.objects:
+            _deselect_all()
+            _set_active(plate)
+            plate.select_set(True)
             try:
-                boolm = plate.modifiers.new(name="Boolean", type='BOOLEAN')
-                boolm.operation = 'DIFFERENCE'
-                boolm.solver = 'FAST'
-                boolm.object = bpy.data.objects.get("FOV")
-                bpy.ops.object.modifier_apply(modifier=boolm.name)
+                bpy.ops.object.modifier_add(type='BOOLEAN')
+                bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
+                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[FOV_OBJECT]
+                bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:
                 pass
             _safe_remove_object(FOV_OBJECT)
@@ -392,21 +396,20 @@ class Export_STL_Custom(Operator):
             ob.select_set(True)
             bpy.ops.object.duplicate(linked=False)
             bpy.ops.object.convert(target='MESH')
-            bpy.context.active_object.name = 'MAINTEXTBOOL'
+            bpy.context.active_object.name = MAIN_TEXT_BOOL_OBJECT
 
             _deselect_all()
             _set_active(plate)
             plate.select_set(True)
-
             try:
-                boolm = plate.modifiers.new(name="BooleanTextMain", type='BOOLEAN')
-                boolm.operation = 'DIFFERENCE'
-                boolm.solver = 'FAST'
-                boolm.object = bpy.data.objects.get("MAINTEXTBOOL")
-                bpy.ops.object.modifier_apply(modifier=boolm.name)
+                bpy.ops.object.modifier_add(type='BOOLEAN')
+                bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
+                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[MAIN_TEXT_BOOL_OBJECT]
+                bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:
                 pass
-            _safe_remove_object('MAINTEXTBOOL')
+            _safe_remove_object(MAIN_TEXT_BOOL_OBJECT)
             select_main = ""
 
         select_upper = UPPER_TEXT_OBJECT
@@ -417,26 +420,25 @@ class Export_STL_Custom(Operator):
             ob.select_set(True)
             bpy.ops.object.duplicate(linked=False)
             bpy.ops.object.convert(target='MESH')
-            bpy.context.active_object.name = 'UPPERTEXTBOOL'
+            bpy.context.active_object.name = UPPER_TEXT_BOOL_OBJECT
 
             _deselect_all()
             _set_active(plate)
             plate.select_set(True)
-
             try:
-                boolm = plate.modifiers.new(name="BooleanTextUpper", type='BOOLEAN')
-                boolm.operation = 'DIFFERENCE'
-                boolm.solver = 'FAST'
-                boolm.object = bpy.data.objects.get("UPPERTEXTBOOL")
-                bpy.ops.object.modifier_apply(modifier=boolm.name)
+                bpy.ops.object.modifier_add(type='BOOLEAN')
+                bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
+                bpy.context.object.modifiers["Boolean"].solver = 'EXACT'
+                bpy.context.object.modifiers["Boolean"].object = bpy.data.objects[UPPER_TEXT_BOOL_OBJECT]
+                bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception:
                 pass
-            _safe_remove_object('UPPERTEXTBOOL')
+            _safe_remove_object(UPPER_TEXT_BOOL_OBJECT)
             select_upper = ""
 
         _deselect_all()
         for o in bpy.data.objects:
-            if o.name in (select_upper, select_main, PLATE_OBJECT, "NUR_RIGHT.002", "NUR_LEFT.002"):
+            if o.name in (select_upper, select_main, PLATE_OBJECT, RIGHT_NUR_EXPORT_OBJECT, LEFT_NUR_EXPORT_OBJECT):
                 o.select_set(True)
 
         try:
@@ -450,7 +452,7 @@ class Export_STL_Custom(Operator):
             else:
                 bpy.ops.export_mesh.stl(filepath=self.filepath + ".stl", use_selection=True, check_existing=True, use_mesh_modifiers=True)
 
-        for n in ('NUR_LEFT.002', 'NUR_RIGHT.002'):
+        for n in (LEFT_NUR_EXPORT_OBJECT, RIGHT_NUR_EXPORT_OBJECT):
             if n in bpy.context.scene.objects:
                 bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 

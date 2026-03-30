@@ -3,7 +3,18 @@ import os
 import bpy
 from bpy.types import Operator
 
-from .constants import pi
+from .constants import (
+    BASE_OBJECT,
+    EMPTY_OBJECT,
+    FOV_OBJECT,
+    IMPORT_PLATE_OBJECT,
+    MAIN_TEXT_OBJECT,
+    NAMEPLATE_LEGACY_OBJECTS,
+    PATH_OBJECT,
+    PLATE_OBJECT,
+    UPPER_TEXT_OBJECT,
+    pi,
+)
 from .helpers import (
     NURNIE_CONFIG,
     _get_base_curve_data,
@@ -90,7 +101,7 @@ def _configure_nurnie_anchor(anchor_name, nur_name, scale_value):
     # Keep this setup aligned with the legacy add/change/mirror order.
     bpy.data.objects[nur_name].parent = bpy.data.objects[anchor_name]
     bpy.ops.object.modifier_add(type='CURVE')
-    bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
+    bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get(PATH_OBJECT)
     bpy.context.object.instance_type = 'FACES'
     bpy.context.object.show_instancer_for_render = False
     bpy.context.object.show_instancer_for_viewport = False
@@ -120,7 +131,7 @@ def _import_selected_nurnie(context, nur_name):
 
 
 def _get_base_dimensions():
-    base = bpy.data.objects.get("BASE")
+    base = bpy.data.objects.get(BASE_OBJECT)
     if not base:
         return None
     return (
@@ -180,9 +191,9 @@ def drawFOV(self, context):
     _ensure_object_mode()
 
     if bpy.context.scene.my_tool.fov_option:
-        _safe_remove_object('FOV')
+        _safe_remove_object(FOV_OBJECT)
 
-        base_obj = bpy.data.objects.get("BASE")
+        base_obj = bpy.data.objects.get(BASE_OBJECT)
         if not base_obj:
             return
 
@@ -217,13 +228,13 @@ def drawFOV(self, context):
 
         try:
             bpy.ops.object.join()
-            bpy.context.active_object.name = 'FOV'
+            bpy.context.active_object.name = FOV_OBJECT
         except Exception:
             pass
     else:
-        _safe_remove_object('FOV')
+        _safe_remove_object(FOV_OBJECT)
 
-    ob = bpy.context.scene.objects.get("PLATE")
+    ob = bpy.context.scene.objects.get(PLATE_OBJECT)
     if ob:
         _deselect_all()
         _set_active(ob)
@@ -231,26 +242,8 @@ def drawFOV(self, context):
 
 
 def _clear_nameplate_objects():
-    legacy_names = (
-        "BASE",
-        "PATH",
-        "EMPTY",
-        "PLATE",
-        "FOV",
-        "MAINTEXT",
-        "UPPERTEXT",
-        "NURNIE_LEFT",
-        "NURNIE_RIGHT",
-        "NUR_LEFT",
-        "NUR_RIGHT",
-        "IMPORTPLATE",
-        "FOV1",
-        "FOV2",
-        "RIGHT_NURNIE",
-    )
-
     managed_names = {obj.name for obj in get_managed_objects()}
-    target_names = managed_names.union(legacy_names)
+    target_names = managed_names.union(NAMEPLATE_LEGACY_OBJECTS)
 
     for object_name in target_names:
         _safe_remove_object(object_name)
@@ -330,9 +323,9 @@ class Import_STL_Custom(Operator):
             bpy.ops.import_mesh.stl(filepath=self.filepath)
 
         for obj in bpy.context.selected_objects:
-            obj.name = "IMPORTPLATE"
+            obj.name = IMPORT_PLATE_OBJECT
             if obj.data:
-                obj.data.name = "IMPORTPLATE"
+                obj.data.name = IMPORT_PLATE_OBJECT
         return {"FINISHED"}
 
 
@@ -357,7 +350,7 @@ class Export_STL_Custom(Operator):
         _ensure_object_mode()
         SetNurnie(self, context)
 
-        plate = bpy.context.scene.objects.get("PLATE")
+        plate = bpy.context.scene.objects.get(PLATE_OBJECT)
         if not plate:
             ShowMessageBox("No PLATE object found.", "Export Failed", 'ERROR')
             return {"CANCELLED"}
@@ -389,11 +382,11 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier=boolm.name)
             except Exception:
                 pass
-            _safe_remove_object('FOV')
+            _safe_remove_object(FOV_OBJECT)
 
-        select_main = "MAINTEXT"
-        if bpy.context.scene.my_tool.eng_bot_text and 'MAINTEXT' in bpy.context.scene.objects:
-            ob = bpy.context.scene.objects["MAINTEXT"]
+        select_main = MAIN_TEXT_OBJECT
+        if bpy.context.scene.my_tool.eng_bot_text and MAIN_TEXT_OBJECT in bpy.context.scene.objects:
+            ob = bpy.context.scene.objects[MAIN_TEXT_OBJECT]
             _deselect_all()
             _set_active(ob)
             ob.select_set(True)
@@ -416,9 +409,9 @@ class Export_STL_Custom(Operator):
             _safe_remove_object('MAINTEXTBOOL')
             select_main = ""
 
-        select_upper = "UPPERTEXT"
-        if bpy.context.scene.my_tool.eng_top_text and 'UPPERTEXT' in bpy.context.scene.objects:
-            ob = bpy.context.scene.objects["UPPERTEXT"]
+        select_upper = UPPER_TEXT_OBJECT
+        if bpy.context.scene.my_tool.eng_top_text and UPPER_TEXT_OBJECT in bpy.context.scene.objects:
+            ob = bpy.context.scene.objects[UPPER_TEXT_OBJECT]
             _deselect_all()
             _set_active(ob)
             ob.select_set(True)
@@ -443,7 +436,7 @@ class Export_STL_Custom(Operator):
 
         _deselect_all()
         for o in bpy.data.objects:
-            if o.name in (select_upper, select_main, "PLATE", "NUR_RIGHT.002", "NUR_LEFT.002"):
+            if o.name in (select_upper, select_main, PLATE_OBJECT, "NUR_RIGHT.002", "NUR_LEFT.002"):
                 o.select_set(True)
 
         try:
@@ -679,7 +672,7 @@ def _delete_nurnie(side):
     for object_name in (config["nurnie"], config["nur"]):
         _safe_remove_object(object_name)
 
-    base_obj = bpy.context.scene.objects.get("BASE")
+        base_obj = bpy.context.scene.objects.get(BASE_OBJECT)
     if base_obj:
         _deselect_all()
         _set_active(base_obj)
@@ -694,7 +687,7 @@ def _mirror_nurnie(side):
     # - do not rebuild the target from a fresh suggested endcap position during cleanup/refactors
     # - this preserves mirror behavior after plate resizes followed by manual nurnie repositioning
     _ensure_object_mode()
-    base_obj = bpy.data.objects.get("BASE")
+    base_obj = bpy.data.objects.get(BASE_OBJECT)
     if not base_obj:
         return {'CANCELLED'}
 
@@ -822,7 +815,7 @@ class Getready_OT_my_op(Operator):
     def execute(self, context):
         _ensure_object_mode()
 
-        base = bpy.data.objects.get("BASE")
+        base = bpy.data.objects.get(BASE_OBJECT)
         if not base:
             return {'CANCELLED'}
 
@@ -834,21 +827,21 @@ class Getready_OT_my_op(Operator):
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, -base_size_x * .5, 0), scale=(1, 1, 1))
         else:
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, -base_size_y * .5, 0), scale=(1, 1, 1))
-        bpy.context.active_object.name = 'EMPTY'
+            bpy.context.active_object.name = EMPTY_OBJECT
 
-        if 'IMPORTPLATE' not in bpy.context.scene.objects:
+        if IMPORT_PLATE_OBJECT not in bpy.context.scene.objects:
             drawPlateTrue(self, context)
         else:
-            bpy.data.objects['IMPORTPLATE'].name = 'PLATE'
+            bpy.data.objects[IMPORT_PLATE_OBJECT].name = PLATE_OBJECT
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-            bpy.context.active_object.name = 'IMPORTPLATE'
+            bpy.context.active_object.name = IMPORT_PLATE_OBJECT
 
         bpy.ops.object.text_add(enter_editmode=True, align='WORLD', location=(0, -1.1, 0), rotation=(1.309, 0, 0))
         bpy.context.object.data.size = 3
         bpy.context.object.data.extrude = 0.6
         bpy.context.object.data.align_x = 'CENTER'
         bpy.context.object.data.align_y = 'CENTER'
-        bpy.context.active_object.name = 'MAINTEXT'
+        bpy.context.active_object.name = MAIN_TEXT_OBJECT
         bpy.ops.font.select_all()
         bpy.ops.font.case_set(case='UPPER')
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -860,7 +853,7 @@ class Getready_OT_my_op(Operator):
         else:
             bpy.context.object.data.offset_x = (base_size_x * pi) * .25
             bpy.ops.object.modifier_add(type='CURVE')
-            bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
+            bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get(PATH_OBJECT)
             bpy.context.object.data.offset_y = 2.1
 
         bpy.ops.object.modifier_add(type='REMESH')
@@ -873,7 +866,7 @@ class Getready_OT_my_op(Operator):
         bpy.context.object.data.extrude = 0.6
         bpy.context.object.data.align_x = 'CENTER'
         bpy.context.object.data.align_y = 'CENTER'
-        bpy.context.active_object.name = 'UPPERTEXT'
+        bpy.context.active_object.name = UPPER_TEXT_OBJECT
         bpy.ops.font.select_all()
         bpy.ops.font.case_set(case='UPPER')
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -884,7 +877,7 @@ class Getready_OT_my_op(Operator):
             bpy.context.object.data.offset_y = 5.5
         else:
             bpy.ops.object.modifier_add(type='CURVE')
-            bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get("PATH")
+            bpy.context.object.modifiers["Curve"].object = bpy.data.objects.get(PATH_OBJECT)
             bpy.context.object.data.offset_x = (base_size_x * pi) * .25
             bpy.context.object.data.offset_y = 5.5
 
@@ -898,7 +891,7 @@ class Getready_OT_my_op(Operator):
         except Exception:
             pass
 
-        plate = bpy.context.scene.objects.get("PLATE")
+        plate = bpy.context.scene.objects.get(PLATE_OBJECT)
         if plate:
             _deselect_all()
             _set_active(plate)

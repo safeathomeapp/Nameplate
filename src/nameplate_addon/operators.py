@@ -187,6 +187,23 @@ def _prepare_nurnie_for_export(side, unhide_fn):
         bpy.data.objects[config["nur"]].hide_set(True)
 
 
+def _cleanup_realized_nurnie_target(realized_name, remove_names):
+    # Realized-nurnie cleanup contract:
+    # - rename the realized export helper object to its final target name
+    # - remove only the replaced source anchor/source pair
+    # - do not change mirror placement or export-prep source object behavior
+    realized_obj = bpy.context.scene.objects.get(RIGHT_NUR_DUPLICATE_OBJECT)
+    if realized_obj:
+        _deselect_all()
+        _set_active(realized_obj)
+        realized_obj.select_set(True)
+        bpy.context.active_object.name = realized_name
+
+    for object_name in remove_names:
+        if object_name in bpy.context.scene.objects:
+            bpy.data.objects.remove(bpy.data.objects[object_name], do_unlink=True)
+
+
 def _get_base_dimensions():
     base = bpy.data.objects.get(BASE_OBJECT)
     if not base:
@@ -555,16 +572,10 @@ class SETNURNIERIGHT_OT_my_op(Operator):
         except Exception:
             pass
 
-        ob = bpy.context.scene.objects.get(RIGHT_NUR_DUPLICATE_OBJECT)
-        if ob:
-            _deselect_all()
-            _set_active(ob)
-            ob.select_set(True)
-            bpy.context.active_object.name = REALIZED_RIGHT_NURNIE_OBJECT
-
-        for n in (RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT):
-            if n in bpy.context.scene.objects:
-                bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
+        _cleanup_realized_nurnie_target(
+            REALIZED_RIGHT_NURNIE_OBJECT,
+            (RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT),
+        )
 
         return {'FINISHED'}
 

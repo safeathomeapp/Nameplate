@@ -325,6 +325,8 @@ def drawFOV(self, context):
 
 
 def _clear_nameplate_objects():
+    # Reset contract:
+    # remove managed objects plus the known legacy object set, but leave unrelated scene data alone.
     managed_names = {obj.name for obj in get_managed_objects()}
     target_names = managed_names.union(NAMEPLATE_LEGACY_OBJECTS)
 
@@ -333,6 +335,9 @@ def _clear_nameplate_objects():
 
 
 def SetNurnie(self, context):
+    # Export-prep contract:
+    # realize temporary left/right nurnie geometry for export only.
+    # This must not change the persisted edit/mirror source objects beyond the temporary unhide/rehide cycle.
     _ensure_object_mode()
     if _prepare_nurnie_for_export("LEFT", unhidenurnieleft) is False:
         return {'CANCELLED'}
@@ -378,6 +383,8 @@ def _report_operator_error(message, exc):
 
 
 def _remove_temp_export_objects():
+    # Export cleanup contract:
+    # these are throwaway helpers and must never survive a successful or failed export.
     for object_name in (
         MAIN_TEXT_BOOL_OBJECT,
         UPPER_TEXT_BOOL_OBJECT,
@@ -402,6 +409,8 @@ def _duplicate_text_for_boolean(source_name, bool_name):
 
 
 def _select_export_objects(*object_names):
+    # Export target contract:
+    # select only the explicit STL payload objects, not arbitrary scene objects that happen to share state.
     _deselect_all()
     selected = []
     for object_name in object_names:
@@ -438,6 +447,8 @@ class Export_STL_Custom(Operator):
             _remove_temp_export_objects()
             return {"CANCELLED"}
 
+        # Apply the plate's shaping modifiers before boolean export work.
+        # The boolean order below is intentionally stable and has Blender 5 beta coverage.
         _deselect_all()
         _set_active(plate)
         plate.select_set(True)
@@ -904,6 +915,9 @@ class Getready_OT_my_op(Operator):
     bl_idname = "getready.myop_operator"
 
     def execute(self, context):
+        # Build/setup contract:
+        # create the bend origin first, keep it named EMPTY for every base family,
+        # then build the plate/text stack around that shared reference object.
         _ensure_object_mode()
 
         base = bpy.data.objects.get(BASE_OBJECT)

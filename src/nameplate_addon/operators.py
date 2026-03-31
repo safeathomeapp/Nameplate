@@ -377,6 +377,45 @@ def _report_operator_error(message, exc):
     ShowMessageBox(detail[:180], "Nameplate Export Warning", 'ERROR')
 
 
+def _remove_temp_export_objects():
+    for object_name in (
+        MAIN_TEXT_BOOL_OBJECT,
+        UPPER_TEXT_BOOL_OBJECT,
+        LEFT_NUR_EXPORT_OBJECT,
+        RIGHT_NUR_EXPORT_OBJECT,
+    ):
+        _safe_remove_object(object_name)
+
+
+def _duplicate_text_for_boolean(source_name, bool_name):
+    source_obj = bpy.context.scene.objects.get(source_name)
+    if not source_obj:
+        return None
+
+    _deselect_all()
+    _set_active(source_obj)
+    source_obj.select_set(True)
+    bpy.ops.object.duplicate(linked=False)
+    bpy.ops.object.convert(target='MESH')
+    bpy.context.active_object.name = bool_name
+    return bpy.context.active_object
+
+
+def _select_export_objects(*object_names):
+    _deselect_all()
+    selected = []
+    for object_name in object_names:
+        obj = bpy.context.scene.objects.get(object_name)
+        if not obj:
+            continue
+        obj.select_set(True)
+        selected.append(obj)
+
+    if selected:
+        _set_active(selected[0])
+    return selected
+
+
 class Export_STL_Custom(Operator):
     bl_idname = "object.export_stl_custom"
     bl_label = "Export STL Custom"
@@ -390,11 +429,13 @@ class Export_STL_Custom(Operator):
 
     def execute(self, context):
         _ensure_object_mode()
+        _remove_temp_export_objects()
         SetNurnie(self, context)
 
         plate = bpy.context.scene.objects.get(PLATE_OBJECT)
         if not plate:
             ShowMessageBox("No PLATE object found.", "Export Failed", 'ERROR')
+            _remove_temp_export_objects()
             return {"CANCELLED"}
 
         _deselect_all()
@@ -408,6 +449,7 @@ class Export_STL_Custom(Operator):
                         bpy.ops.object.modifier_apply(modifier=mod_name)
                     except Exception as exc:
                         _report_operator_error(f"Failed to apply modifier '{mod_name}'", exc)
+                        _remove_temp_export_objects()
                         return {"CANCELLED"}
 
         if 'FOV' in bpy.context.scene.objects:
@@ -422,18 +464,16 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply FOV boolean", exc)
+                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(FOV_OBJECT)
 
         select_main = MAIN_TEXT_OBJECT
         if bpy.context.scene.my_tool.eng_bot_text and MAIN_TEXT_OBJECT in bpy.context.scene.objects:
-            ob = bpy.context.scene.objects[MAIN_TEXT_OBJECT]
-            _deselect_all()
-            _set_active(ob)
-            ob.select_set(True)
-            bpy.ops.object.duplicate(linked=False)
-            bpy.ops.object.convert(target='MESH')
-            bpy.context.active_object.name = MAIN_TEXT_BOOL_OBJECT
+            if not _duplicate_text_for_boolean(MAIN_TEXT_OBJECT, MAIN_TEXT_BOOL_OBJECT):
+                _report_operator_error("Failed to prepare main text boolean object", "source text not available")
+                _remove_temp_export_objects()
+                return {"CANCELLED"}
 
             _deselect_all()
             _set_active(plate)
@@ -446,19 +486,17 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply main text boolean", exc)
+                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(MAIN_TEXT_BOOL_OBJECT)
             select_main = ""
 
         select_upper = UPPER_TEXT_OBJECT
         if bpy.context.scene.my_tool.eng_top_text and UPPER_TEXT_OBJECT in bpy.context.scene.objects:
-            ob = bpy.context.scene.objects[UPPER_TEXT_OBJECT]
-            _deselect_all()
-            _set_active(ob)
-            ob.select_set(True)
-            bpy.ops.object.duplicate(linked=False)
-            bpy.ops.object.convert(target='MESH')
-            bpy.context.active_object.name = UPPER_TEXT_BOOL_OBJECT
+            if not _duplicate_text_for_boolean(UPPER_TEXT_OBJECT, UPPER_TEXT_BOOL_OBJECT):
+                _report_operator_error("Failed to prepare upper text boolean object", "source text not available")
+                _remove_temp_export_objects()
+                return {"CANCELLED"}
 
             _deselect_all()
             _set_active(plate)
@@ -471,14 +509,18 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply upper text boolean", exc)
+                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(UPPER_TEXT_BOOL_OBJECT)
             select_upper = ""
 
-        _deselect_all()
-        for o in bpy.data.objects:
-            if o.name in (select_upper, select_main, PLATE_OBJECT, RIGHT_NUR_EXPORT_OBJECT, LEFT_NUR_EXPORT_OBJECT):
-                o.select_set(True)
+        _select_export_objects(
+            select_upper,
+            select_main,
+            PLATE_OBJECT,
+            RIGHT_NUR_EXPORT_OBJECT,
+            LEFT_NUR_EXPORT_OBJECT,
+        )
 
         try:
             if self.filepath.lower().endswith('.stl'):
@@ -494,11 +536,10 @@ class Export_STL_Custom(Operator):
                     bpy.ops.export_mesh.stl(filepath=self.filepath + ".stl", use_selection=True, check_existing=True, use_mesh_modifiers=True)
             except Exception as fallback_exc:
                 _report_operator_error("Both STL export operators failed", fallback_exc)
+                _remove_temp_export_objects()
                 return {"CANCELLED"}
 
-        for n in (LEFT_NUR_EXPORT_OBJECT, RIGHT_NUR_EXPORT_OBJECT):
-            if n in bpy.context.scene.objects:
-                bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
+        _remove_temp_export_objects()
 
         _deselect_all()
         _set_active(plate)

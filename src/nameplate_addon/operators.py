@@ -877,7 +877,7 @@ class Getready_OT_my_op(Operator):
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, -base_size_x * .5, 0), scale=(1, 1, 1))
         else:
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, -base_size_y * .5, 0), scale=(1, 1, 1))
-            bpy.context.active_object.name = EMPTY_OBJECT
+        bpy.context.active_object.name = EMPTY_OBJECT
 
         if IMPORT_PLATE_OBJECT not in bpy.context.scene.objects:
             drawPlateTrue(self, context)

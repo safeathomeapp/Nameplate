@@ -1,6 +1,6 @@
 import bpy
 
-from .constants import pi
+from .constants import BASE_OBJECT, EMPTY_OBJECT, PLATE_OBJECT, pi
 from .helpers import (
     _bevel_end_cap_profile,
     _bevel_top_plate_profile,
@@ -27,13 +27,6 @@ def drawPlateTrue(self, context):
     def halfscale(x, y, z):
         return (x * 0.5, y * 0.5, z * 0.5)
 
-    O035 = ()
-    O042 = ()
-    O052 = ()
-    O070 = ()
-    O092 = ()
-    O095 = ()
-    O105 = ()
     L060 = ((30.3, 34.4), (44.1, 54.7), (51.7, 67))
     L075 = ((36.9, 33), (54, 51), (63.3, 63.3))
     L090 = ((45.5, 34.8), (65.8, 53.7), (77.4, 66.3))
@@ -42,10 +35,10 @@ def drawPlateTrue(self, context):
     L150 = ((81.9, 41.7), (116, 62.6), (135, 76.1))
     L170 = ((87.5, 40.5), (125, 60.3), (145, 73.1))
 
-    if "BASE" not in bpy.data.objects:
+    if BASE_OBJECT not in bpy.data.objects:
         return
 
-    base_obj = bpy.data.objects["BASE"]
+    base_obj = bpy.data.objects[BASE_OBJECT]
     base_type = base_obj.data.name[:1]
     base_size_x = int(base_obj.data.name[1:4])
     base_string_x = base_obj.data.name[1:4]
@@ -154,13 +147,12 @@ def drawPlateTrue(self, context):
     else:
         _safe_remove_object('TopBit')
 
-    ends_def = [
-        ("LEFT",  -1.0, 'END_LEFT'),
-        ("RIGHT",  1.0, 'END_RIGHT'),
-    ]
-    for _side, sign, name in ends_def:
-        if name in bpy.context.scene.objects:
-            bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
+    ends_def = (
+        (-1.0, 'END_LEFT'),
+        (1.0, 'END_RIGHT'),
+    )
+    for sign, name in ends_def:
+        _safe_remove_object(name)
 
         loc = (
             sign * ((user_x * 0.5) + (end_length * 0.5)),
@@ -199,9 +191,9 @@ def drawPlateTrue(self, context):
     plate = bpy.context.active_object
     if not plate:
         return
-    plate.name = 'PLATE'
+    plate.name = PLATE_OBJECT
     plate["nameplate_managed"] = True
-    plate["nameplate_role"] = "PLATE"
+    plate["nameplate_role"] = PLATE_OBJECT
 
     plate.rotation_euler[0] = -0.261799
     plate.rotation_euler[1] = 0.0
@@ -223,7 +215,7 @@ def drawPlateTrue(self, context):
         simp = plate.modifiers.new(name="SimpleDeform", type='SIMPLE_DEFORM')
         simp.deform_method = 'BEND'
         simp.deform_axis = 'Z'
-        simp.origin = bpy.data.objects.get("EMPTY")
+        simp.origin = bpy.data.objects.get(EMPTY_OBJECT)
         simp.angle = curve_x
     except Exception:
         pass

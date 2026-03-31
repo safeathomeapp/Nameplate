@@ -384,7 +384,13 @@ def italicText(self, context):
     if not obj or obj.type != 'FONT':
         return
     try:
-        if bpy.context.scene.my_tool.it_bot_text:
+        tool = bpy.context.scene.my_tool
+        if obj.name == "UPPERTEXT":
+            is_italic = bool(tool.it_top_text)
+        else:
+            is_italic = bool(tool.it_bot_text)
+
+        if is_italic:
             obj.data.shear = 0.2
         else:
             obj.data.shear = 0.0

@@ -176,8 +176,9 @@ def _prepare_nurnie_for_export(side, unhide_fn):
     try:
         bpy.ops.object.duplicate()
         bpy.ops.object.duplicates_make_real()
-    except Exception:
-        pass
+    except Exception as exc:
+        _report_operator_error(f"Failed to realize nurnie export helper for {side}", exc)
+        return False
 
     for object_name in (duplicate_anchor_name, duplicate_nur_name):
         if object_name in bpy.data.objects:
@@ -185,6 +186,7 @@ def _prepare_nurnie_for_export(side, unhide_fn):
 
     if config["nur"] in bpy.data.objects:
         bpy.data.objects[config["nur"]].hide_set(True)
+    return True
 
 
 def _cleanup_realized_nurnie_target(realized_name, remove_names):
@@ -198,10 +200,17 @@ def _cleanup_realized_nurnie_target(realized_name, remove_names):
         _set_active(realized_obj)
         realized_obj.select_set(True)
         bpy.context.active_object.name = realized_name
+    else:
+        _report_operator_error(
+            f"Expected realized nurnie helper '{RIGHT_NUR_DUPLICATE_OBJECT}' was not found",
+            RuntimeError("realized helper missing"),
+        )
+        return False
 
     for object_name in remove_names:
         if object_name in bpy.context.scene.objects:
             bpy.data.objects.remove(bpy.data.objects[object_name], do_unlink=True)
+    return True
 
 
 def _get_base_dimensions():
@@ -325,8 +334,11 @@ def _clear_nameplate_objects():
 
 def SetNurnie(self, context):
     _ensure_object_mode()
-    _prepare_nurnie_for_export("LEFT", unhidenurnieleft)
-    _prepare_nurnie_for_export("RIGHT", unhidenurnieright)
+    if _prepare_nurnie_for_export("LEFT", unhidenurnieleft) is False:
+        return {'CANCELLED'}
+    if _prepare_nurnie_for_export("RIGHT", unhidenurnieright) is False:
+        return {'CANCELLED'}
+    return {'FINISHED'}
 
 
 class Import_STL_Custom(Operator):
@@ -584,13 +596,15 @@ class SETNURNIERIGHT_OT_my_op(Operator):
         _ensure_object_mode()
         try:
             bpy.ops.object.duplicates_make_real()
-        except Exception:
-            pass
+        except Exception as exc:
+            _report_operator_error("Failed to make right nurnie helper real", exc)
+            return {'CANCELLED'}
 
-        _cleanup_realized_nurnie_target(
+        if _cleanup_realized_nurnie_target(
             REALIZED_RIGHT_NURNIE_OBJECT,
             (RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT),
-        )
+        ) is False:
+            return {'CANCELLED'}
 
         return {'FINISHED'}
 
@@ -746,8 +760,12 @@ def _mirror_nurnie(side):
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
-        bpy.ops.object.duplicate()
-        bpy.ops.object.parent_clear(type='CLEAR')
+        try:
+            bpy.ops.object.duplicate()
+            bpy.ops.object.parent_clear(type='CLEAR')
+        except Exception as exc:
+            _report_operator_error("Failed to duplicate left nurnie for mirror", exc)
+            return {'CANCELLED'}
         bpy.context.active_object.name = RIGHT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("RIGHT", base_type, base_size_x, base_size_y, anchor_state)
@@ -795,8 +813,12 @@ def _mirror_nurnie(side):
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
-        bpy.ops.object.duplicate()
-        bpy.ops.object.parent_clear(type='CLEAR')
+        try:
+            bpy.ops.object.duplicate()
+            bpy.ops.object.parent_clear(type='CLEAR')
+        except Exception as exc:
+            _report_operator_error("Failed to duplicate right nurnie for mirror", exc)
+            return {'CANCELLED'}
         bpy.context.active_object.name = LEFT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("LEFT", base_type, base_size_x, base_size_y, anchor_state)

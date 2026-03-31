@@ -1,5 +1,6 @@
 import bpy
 
+from .constants import BASE_OBJECT, NAMEPLATE_LEGACY_OBJECTS, PATH_OBJECT
 from .helpers import (
     _ensure_object_mode,
     _inset_top_face,
@@ -9,10 +10,14 @@ from .helpers import (
 )
 
 
+def _clear_full_nameplate_scene():
+    for name in NAMEPLATE_LEGACY_OBJECTS:
+        _safe_remove_object(name)
+
+
 def drawCBase(self, context):
     _ensure_object_mode()
-    for name in ['PATH', 'BASE', 'EMPTY', 'PLATE', 'FOV', 'MAINTEXT', 'UPPERTEXT', 'NURNIE_LEFT', 'NURNIE_RIGHT', 'NUR_LEFT', 'NUR_RIGHT']:
-        _safe_remove_object(name)
+    _clear_full_nameplate_scene()
 
     base_size_x = int(bpy.context.scene.my_tool.my_BCIRCLE[1:4])
     base_size_y = int(bpy.context.scene.my_tool.my_BCIRCLE[4:])
@@ -26,11 +31,11 @@ def drawCBase(self, context):
         bpy.ops.object.mode_set(mode='OBJECT')
     except Exception:
         _ensure_object_mode()
-    path.name = 'PATH'
+    path.name = PATH_OBJECT
 
     bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=base_size_x * 0.5, depth=4, enter_editmode=False, align='WORLD', location=(0, 0, 2))
     base = bpy.context.active_object
-    base.name = 'BASE'
+    base.name = BASE_OBJECT
     base.data.name = bpy.context.scene.my_tool.my_BCIRCLE
 
     try:
@@ -57,8 +62,8 @@ def drawCBase(self, context):
 
 def drawOBase(self, context):
     _ensure_object_mode()
-    _safe_remove_object('PATH')
-    _safe_remove_object('BASE')
+    _safe_remove_object(PATH_OBJECT)
+    _safe_remove_object(BASE_OBJECT)
 
     base_size_x = int(bpy.context.scene.my_tool.my_BOVAL[1:4])
     base_size_y = int(bpy.context.scene.my_tool.my_BOVAL[4:7])
@@ -74,7 +79,7 @@ def drawOBase(self, context):
         bpy.ops.object.mode_set(mode='OBJECT')
     except Exception:
         _ensure_object_mode()
-    path.name = 'PATH'
+    path.name = PATH_OBJECT
 
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=64,
@@ -95,7 +100,7 @@ def drawOBase(self, context):
 
     _inset_top_face(base, (base_size_x - 2) / base_size_x, (base_size_y - 2) / base_size_y)
 
-    base.name = 'BASE'
+    base.name = BASE_OBJECT
     base.data.name = bpy.context.scene.my_tool.my_BOVAL
 
     _set_random_viewport_color()
@@ -103,8 +108,8 @@ def drawOBase(self, context):
 
 def drawSBase(self, context):
     _ensure_object_mode()
-    _safe_remove_object('PATH')
-    _safe_remove_object('BASE')
+    _safe_remove_object(PATH_OBJECT)
+    _safe_remove_object(BASE_OBJECT)
 
     base_size_x = int(bpy.context.scene.my_tool.my_BSQUARE[1:4])
     base_size_y = int(bpy.context.scene.my_tool.my_BSQUARE[4:7])
@@ -116,7 +121,7 @@ def drawSBase(self, context):
         location=(0, -base_size_y * 0.5, 0),
         scale=(1, 1, 1)
     )
-    bpy.context.active_object.name = 'PATH'
+    bpy.context.active_object.name = PATH_OBJECT
 
     bpy.ops.mesh.primitive_cube_add(
         enter_editmode=False,
@@ -128,7 +133,7 @@ def drawSBase(self, context):
 
     _inset_top_face(base, (base_size_x - 2) / base_size_x, (base_size_y - 2) / base_size_y)
 
-    base.name = 'BASE'
+    base.name = BASE_OBJECT
     base.data.name = bpy.context.scene.my_tool.my_BSQUARE
 
     _set_random_viewport_color()
@@ -136,8 +141,8 @@ def drawSBase(self, context):
 
 def drawZBase(self, context):
     _ensure_object_mode()
-    _safe_remove_object('PATH')
-    _safe_remove_object('BASE')
+    _safe_remove_object(PATH_OBJECT)
+    _safe_remove_object(BASE_OBJECT)
 
     base_size_x = int(bpy.context.scene.my_tool.my_BSPECIAL[1:4])
     base_size_y = int(bpy.context.scene.my_tool.my_BSPECIAL[4:7])
@@ -151,7 +156,7 @@ def drawZBase(self, context):
         bpy.ops.object.mode_set(mode='OBJECT')
     except Exception:
         _ensure_object_mode()
-    path.name = 'PATH'
+    path.name = PATH_OBJECT
 
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=64,
@@ -188,7 +193,7 @@ def drawZBase(self, context):
     except Exception:
         _ensure_object_mode()
 
-    base.name = 'BASE'
+    base.name = BASE_OBJECT
     base.data.name = bpy.context.scene.my_tool.my_BSPECIAL
 
     _set_random_viewport_color()

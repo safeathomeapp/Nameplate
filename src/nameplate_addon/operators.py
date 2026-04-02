@@ -176,9 +176,8 @@ def _prepare_nurnie_for_export(side, unhide_fn):
     try:
         bpy.ops.object.duplicate()
         bpy.ops.object.duplicates_make_real()
-    except Exception as exc:
-        _report_operator_error(f"Failed to realize nurnie export helper for {side}", exc)
-        return False
+    except Exception:
+        pass
 
     for object_name in (duplicate_anchor_name, duplicate_nur_name):
         if object_name in bpy.data.objects:
@@ -186,7 +185,6 @@ def _prepare_nurnie_for_export(side, unhide_fn):
 
     if config["nur"] in bpy.data.objects:
         bpy.data.objects[config["nur"]].hide_set(True)
-    return True
 
 
 def _cleanup_realized_nurnie_target(realized_name, remove_names):
@@ -200,17 +198,10 @@ def _cleanup_realized_nurnie_target(realized_name, remove_names):
         _set_active(realized_obj)
         realized_obj.select_set(True)
         bpy.context.active_object.name = realized_name
-    else:
-        _report_operator_error(
-            f"Expected realized nurnie helper '{RIGHT_NUR_DUPLICATE_OBJECT}' was not found",
-            RuntimeError("realized helper missing"),
-        )
-        return False
 
     for object_name in remove_names:
         if object_name in bpy.context.scene.objects:
             bpy.data.objects.remove(bpy.data.objects[object_name], do_unlink=True)
-    return True
 
 
 def _get_base_dimensions():
@@ -325,8 +316,6 @@ def drawFOV(self, context):
 
 
 def _clear_nameplate_objects():
-    # Reset contract:
-    # remove managed objects plus the known legacy object set, but leave unrelated scene data alone.
     managed_names = {obj.name for obj in get_managed_objects()}
     target_names = managed_names.union(NAMEPLATE_LEGACY_OBJECTS)
 
@@ -335,15 +324,9 @@ def _clear_nameplate_objects():
 
 
 def SetNurnie(self, context):
-    # Export-prep contract:
-    # realize temporary left/right nurnie geometry for export only.
-    # This must not change the persisted edit/mirror source objects beyond the temporary unhide/rehide cycle.
     _ensure_object_mode()
-    if _prepare_nurnie_for_export("LEFT", unhidenurnieleft) is False:
-        return {'CANCELLED'}
-    if _prepare_nurnie_for_export("RIGHT", unhidenurnieright) is False:
-        return {'CANCELLED'}
-    return {'FINISHED'}
+    _prepare_nurnie_for_export("LEFT", unhidenurnieleft)
+    _prepare_nurnie_for_export("RIGHT", unhidenurnieright)
 
 
 class Import_STL_Custom(Operator):
@@ -382,49 +365,6 @@ def _report_operator_error(message, exc):
     ShowMessageBox(detail[:180], "Nameplate Export Warning", 'ERROR')
 
 
-def _remove_temp_export_objects():
-    # Export cleanup contract:
-    # these are throwaway helpers and must never survive a successful or failed export.
-    for object_name in (
-        MAIN_TEXT_BOOL_OBJECT,
-        UPPER_TEXT_BOOL_OBJECT,
-        LEFT_NUR_EXPORT_OBJECT,
-        RIGHT_NUR_EXPORT_OBJECT,
-    ):
-        _safe_remove_object(object_name)
-
-
-def _duplicate_text_for_boolean(source_name, bool_name):
-    source_obj = bpy.context.scene.objects.get(source_name)
-    if not source_obj:
-        return None
-
-    _deselect_all()
-    _set_active(source_obj)
-    source_obj.select_set(True)
-    bpy.ops.object.duplicate(linked=False)
-    bpy.ops.object.convert(target='MESH')
-    bpy.context.active_object.name = bool_name
-    return bpy.context.active_object
-
-
-def _select_export_objects(*object_names):
-    # Export target contract:
-    # select only the explicit STL payload objects, not arbitrary scene objects that happen to share state.
-    _deselect_all()
-    selected = []
-    for object_name in object_names:
-        obj = bpy.context.scene.objects.get(object_name)
-        if not obj:
-            continue
-        obj.select_set(True)
-        selected.append(obj)
-
-    if selected:
-        _set_active(selected[0])
-    return selected
-
-
 class Export_STL_Custom(Operator):
     bl_idname = "object.export_stl_custom"
     bl_label = "Export STL Custom"
@@ -438,17 +378,13 @@ class Export_STL_Custom(Operator):
 
     def execute(self, context):
         _ensure_object_mode()
-        _remove_temp_export_objects()
         SetNurnie(self, context)
 
         plate = bpy.context.scene.objects.get(PLATE_OBJECT)
         if not plate:
             ShowMessageBox("No PLATE object found.", "Export Failed", 'ERROR')
-            _remove_temp_export_objects()
             return {"CANCELLED"}
 
-        # Apply the plate's shaping modifiers before boolean export work.
-        # The boolean order below is intentionally stable and has Blender 5 beta coverage.
         _deselect_all()
         _set_active(plate)
         plate.select_set(True)
@@ -460,7 +396,6 @@ class Export_STL_Custom(Operator):
                         bpy.ops.object.modifier_apply(modifier=mod_name)
                     except Exception as exc:
                         _report_operator_error(f"Failed to apply modifier '{mod_name}'", exc)
-                        _remove_temp_export_objects()
                         return {"CANCELLED"}
 
         if 'FOV' in bpy.context.scene.objects:
@@ -475,16 +410,18 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply FOV boolean", exc)
-                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(FOV_OBJECT)
 
         select_main = MAIN_TEXT_OBJECT
         if bpy.context.scene.my_tool.eng_bot_text and MAIN_TEXT_OBJECT in bpy.context.scene.objects:
-            if not _duplicate_text_for_boolean(MAIN_TEXT_OBJECT, MAIN_TEXT_BOOL_OBJECT):
-                _report_operator_error("Failed to prepare main text boolean object", "source text not available")
-                _remove_temp_export_objects()
-                return {"CANCELLED"}
+            ob = bpy.context.scene.objects[MAIN_TEXT_OBJECT]
+            _deselect_all()
+            _set_active(ob)
+            ob.select_set(True)
+            bpy.ops.object.duplicate(linked=False)
+            bpy.ops.object.convert(target='MESH')
+            bpy.context.active_object.name = MAIN_TEXT_BOOL_OBJECT
 
             _deselect_all()
             _set_active(plate)
@@ -497,17 +434,19 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply main text boolean", exc)
-                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(MAIN_TEXT_BOOL_OBJECT)
             select_main = ""
 
         select_upper = UPPER_TEXT_OBJECT
         if bpy.context.scene.my_tool.eng_top_text and UPPER_TEXT_OBJECT in bpy.context.scene.objects:
-            if not _duplicate_text_for_boolean(UPPER_TEXT_OBJECT, UPPER_TEXT_BOOL_OBJECT):
-                _report_operator_error("Failed to prepare upper text boolean object", "source text not available")
-                _remove_temp_export_objects()
-                return {"CANCELLED"}
+            ob = bpy.context.scene.objects[UPPER_TEXT_OBJECT]
+            _deselect_all()
+            _set_active(ob)
+            ob.select_set(True)
+            bpy.ops.object.duplicate(linked=False)
+            bpy.ops.object.convert(target='MESH')
+            bpy.context.active_object.name = UPPER_TEXT_BOOL_OBJECT
 
             _deselect_all()
             _set_active(plate)
@@ -520,18 +459,14 @@ class Export_STL_Custom(Operator):
                 bpy.ops.object.modifier_apply(modifier="Boolean")
             except Exception as exc:
                 _report_operator_error("Failed to apply upper text boolean", exc)
-                _remove_temp_export_objects()
                 return {"CANCELLED"}
             _safe_remove_object(UPPER_TEXT_BOOL_OBJECT)
             select_upper = ""
 
-        _select_export_objects(
-            select_upper,
-            select_main,
-            PLATE_OBJECT,
-            RIGHT_NUR_EXPORT_OBJECT,
-            LEFT_NUR_EXPORT_OBJECT,
-        )
+        _deselect_all()
+        for o in bpy.data.objects:
+            if o.name in (select_upper, select_main, PLATE_OBJECT, RIGHT_NUR_EXPORT_OBJECT, LEFT_NUR_EXPORT_OBJECT):
+                o.select_set(True)
 
         try:
             if self.filepath.lower().endswith('.stl'):
@@ -547,10 +482,11 @@ class Export_STL_Custom(Operator):
                     bpy.ops.export_mesh.stl(filepath=self.filepath + ".stl", use_selection=True, check_existing=True, use_mesh_modifiers=True)
             except Exception as fallback_exc:
                 _report_operator_error("Both STL export operators failed", fallback_exc)
-                _remove_temp_export_objects()
                 return {"CANCELLED"}
 
-        _remove_temp_export_objects()
+        for n in (LEFT_NUR_EXPORT_OBJECT, RIGHT_NUR_EXPORT_OBJECT):
+            if n in bpy.context.scene.objects:
+                bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
         _deselect_all()
         _set_active(plate)
@@ -648,15 +584,13 @@ class SETNURNIERIGHT_OT_my_op(Operator):
         _ensure_object_mode()
         try:
             bpy.ops.object.duplicates_make_real()
-        except Exception as exc:
-            _report_operator_error("Failed to make right nurnie helper real", exc)
-            return {'CANCELLED'}
+        except Exception:
+            pass
 
-        if _cleanup_realized_nurnie_target(
+        _cleanup_realized_nurnie_target(
             REALIZED_RIGHT_NURNIE_OBJECT,
             (RIGHT_NURNIE_OBJECT, RIGHT_NUR_OBJECT),
-        ) is False:
-            return {'CANCELLED'}
+        )
 
         return {'FINISHED'}
 
@@ -812,12 +746,8 @@ def _mirror_nurnie(side):
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
-        try:
-            bpy.ops.object.duplicate()
-            bpy.ops.object.parent_clear(type='CLEAR')
-        except Exception as exc:
-            _report_operator_error("Failed to duplicate left nurnie for mirror", exc)
-            return {'CANCELLED'}
+        bpy.ops.object.duplicate()
+        bpy.ops.object.parent_clear(type='CLEAR')
         bpy.context.active_object.name = RIGHT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("RIGHT", base_type, base_size_x, base_size_y, anchor_state)
@@ -865,12 +795,8 @@ def _mirror_nurnie(side):
         _deselect_all()
         _set_active(ob)
         ob.select_set(True)
-        try:
-            bpy.ops.object.duplicate()
-            bpy.ops.object.parent_clear(type='CLEAR')
-        except Exception as exc:
-            _report_operator_error("Failed to duplicate right nurnie for mirror", exc)
-            return {'CANCELLED'}
+        bpy.ops.object.duplicate()
+        bpy.ops.object.parent_clear(type='CLEAR')
         bpy.context.active_object.name = LEFT_NUR_OBJECT
 
         anchor_location = _mirror_nurnie_plane_location("LEFT", base_type, base_size_x, base_size_y, anchor_state)
@@ -915,9 +841,6 @@ class Getready_OT_my_op(Operator):
     bl_idname = "getready.myop_operator"
 
     def execute(self, context):
-        # Build/setup contract:
-        # create the bend origin first, keep it named EMPTY for every base family,
-        # then build the plate/text stack around that shared reference object.
         _ensure_object_mode()
 
         base = bpy.data.objects.get(BASE_OBJECT)

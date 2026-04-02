@@ -485,10 +485,7 @@ def selectItem(self, context):
         _deselect_all()
         _set_active(menu)
         menu.select_set(True)
-        return
-
-    default = bpy.context.scene.objects.get("BASE")
-    if default:
-        _deselect_all()
-        _set_active(default)
-        default.select_set(True)
+    # If the requested target does not exist yet, keep the current selection.
+    # This is important for add-state UI such as left/right nurnies, where
+    # forcing selection back to BASE makes the panel feel like it needs
+    # an extra click before the add controls appear.

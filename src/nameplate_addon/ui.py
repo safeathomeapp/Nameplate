@@ -13,9 +13,53 @@ from .constants import (
     UPPER_TEXT_OBJECT,
 )
 
+_LAST_ACTIVE_TARGET_NAME = None
+
 
 def _get_target_object(context, target_name):
     return context.scene.objects.get(target_name)
+
+
+def _draw_section_header(layout, title, icon):
+    box = layout.box()
+    box.label(text=title, icon=icon)
+    return box
+
+
+def _get_base_summary(mytool, base_obj):
+    if not base_obj or not getattr(base_obj, "data", None):
+        return ("No base", "")
+
+    base_code = base_obj.data.name
+    family_labels = {
+        "BCIRCLE": "Circle",
+        "BOVAL": "Oval",
+        "BSQUARE": "Square",
+        "BSPECIAL": "Special",
+    }
+    family = family_labels.get(mytool.my_baselist, base_code[:1])
+    return (family, base_code[1:])
+
+
+def _draw_build_summary(layout, mytool, base_obj, scene):
+    family, size_label = _get_base_summary(mytool, base_obj)
+    left_nurnie = "Yes" if scene.objects.get(LEFT_NURNIE_OBJECT) else "No"
+    right_nurnie = "Yes" if scene.objects.get(RIGHT_NURNIE_OBJECT) else "No"
+    top_plate = "On" if mytool.add_top else "Off"
+
+    box = _draw_section_header(layout, "Current Build", 'INFO')
+    col = box.column(align=True)
+    col.label(text=f"Base: {family} {size_label}".strip())
+    col.label(text=f"Height: {mytool.my_user_z}mm")
+    col.label(text=f"Top Plate: {top_plate}")
+    col.label(text=f"Nurnies: L {left_nurnie} | R {right_nurnie}")
+
+    if mytool.my_baselist in {"BCIRCLE", "BSPECIAL"}:
+        arc_map = {"25": "90", "33": "120", "41": "150", "50": "180"}
+        col.label(text=f"Arc: {arc_map.get(mytool.angles, mytool.angles)} degrees")
+    elif mytool.my_baselist == "BOVAL":
+        arc_map = {"0": "90", "1": "120", "2": "135"}
+        col.label(text=f"Arc: {arc_map.get(mytool.o_angles, mytool.o_angles)} degrees")
 
 
 def _sync_edit_target_from_active_object(context, mytool):
@@ -37,6 +81,8 @@ def _sync_edit_target_from_active_object(context, mytool):
 
 @persistent
 def _sync_edit_target_handler(_scene, _depsgraph):
+    global _LAST_ACTIVE_TARGET_NAME
+
     context = bpy.context
     scene = getattr(context, "scene", None)
     if scene is None or not hasattr(scene, "my_tool"):
@@ -51,32 +97,79 @@ def _sync_edit_target_handler(_scene, _depsgraph):
 
     plate_obj = scene.objects.get(PLATE_OBJECT)
     if not plate_obj:
+        _LAST_ACTIVE_TARGET_NAME = None
+        return
+
+    target_names = {
+        PLATE_OBJECT,
+        MAIN_TEXT_OBJECT,
+        UPPER_TEXT_OBJECT,
+        LEFT_NURNIE_OBJECT,
+        RIGHT_NURNIE_OBJECT,
+    }
+
+    active_name = active_obj.name
+    if active_name not in target_names:
+        return
+
+    if active_name == _LAST_ACTIVE_TARGET_NAME:
         return
 
     try:
         _sync_edit_target_from_active_object(context, scene.my_tool)
+        _LAST_ACTIVE_TARGET_NAME = active_name
     except Exception:
         pass
 
 
 def _draw_edit_actions(layout, mytool, import_plate):
-    box = layout.box()
+    box = _draw_section_header(layout, "Edit And Export", 'TOOL_SETTINGS')
     box.label(text="Edit Target", icon='GREASEPENCIL')
     box.prop(mytool, "my_item", expand=True)
-    box.label(text="Actions", icon='TOOL_SETTINGS')
-    box.operator("object.export_stl_custom", text="Export STL", icon='DISK_DRIVE')
-    box.operator("clear_scene.myop_operator", text="Start Over", icon='RECOVER_LAST')
+    row = box.row(align=True)
+    row.operator("object.export_stl_custom", text="Export STL", icon='DISK_DRIVE')
+    row.operator("clear_scene.myop_operator", text="Start Over", icon='RECOVER_LAST')
     if not import_plate:
         box.operator("draw.myop_operator", text="Rebuild Plate", icon='FILE_REFRESH')
 
 
+def _draw_setup_panel(layout, mytool, base_obj):
+    box = _draw_section_header(layout, "Setup", 'SETTINGS')
+    box.label(text="Choose a workflow")
+    box.prop(mytool, "my_newbase", expand=True)
+
+    if mytool.my_newbase == "IMPORT":
+        import_box = layout.box()
+        import_box.label(text="Import a previously saved plate", icon='IMPORT')
+        import_box.operator("object.import_stl_custom", text="Import a Saved Plate", icon='FILE_NEW')
+        return
+
+    create_box = layout.box()
+    create_box.label(text="Create a new plate", icon='FILE_NEW')
+    create_box.label(text="Choose your base shape", icon='PROP_ON')
+    create_box.prop(mytool, "my_baselist", expand=True)
+    create_box.label(text="Choose your base size", icon='PROP_ON')
+    create_box.prop(mytool, "my_" + mytool.my_baselist, expand=True)
+    if base_obj:
+        create_box.operator("getready.myop_operator", text="Confirm Base Choice", icon='CHECKBOX_HLT')
+
+
+def _draw_import_alignment_panel(layout, mytool, base_obj):
+    box = _draw_section_header(layout, "Import Alignment", 'IMPORT')
+    box.operator("wm.importhelp", text="Read Import Note")
+    box.label(text="Choose your base shape", icon='PROP_ON')
+    box.prop(mytool, "my_baselist", expand=True)
+    box.label(text="Choose your base size", icon='PROP_ON')
+    box.prop(mytool, "my_" + mytool.my_baselist, expand=True)
+    if base_obj:
+        box.operator("getready.myop_operator", text="Confirm Base Choice", icon='CHECKBOX_HLT')
+
+
 def _draw_text_editor(layout, obj, text, mytool, engrave_prop, italic_prop, extra_prop_name):
-    box = layout.box()
-    box.label(text="Text", icon='SMALL_CAPS')
+    box = _draw_section_header(layout, "Text", 'SMALL_CAPS')
     box.prop(text, 'body', text="")
 
-    box = layout.box()
-    box.label(text="Font", icon='FONT_DATA')
+    box = _draw_section_header(layout, "Font And Position", 'FONT_DATA')
     box.template_ID(text, "font", open="font.open", unlink="font.unlink")
 
     row = box.row()
@@ -92,7 +185,7 @@ def _draw_text_editor(layout, obj, text, mytool, engrave_prop, italic_prop, extr
     box.prop(obj, 'myZFloat', slider=False)
     box.prop(obj, 'myYFloat', slider=False)
 
-    box = layout.box()
+    box = _draw_section_header(layout, "Text Extras", 'PREFERENCES')
     row = box.row()
     row.prop(mytool, extra_prop_name)
     row.label(text="Extra Options")
@@ -115,8 +208,7 @@ def _draw_nurnie_editor(layout, obj, wm, base_type, side):
     change_operator = "changenurnieleft.myop_operator" if side == "LEFT" else "changenurnieright.myop_operator"
     delete_operator = "deletenurnieleft.myop_operator" if side == "LEFT" else "deletenurnieright.myop_operator"
 
-    box = layout.box()
-    box.label(text=side_title, icon='MESH_PLANE')
+    box = _draw_section_header(layout, side_title, 'MESH_PLANE')
     loc_text = "Left / Right" if base_type == "S" else "Around Curve"
     box.prop(obj, 'location', index=0, text=loc_text)
     box.prop(obj, 'myNurnZFloat', slider=False)
@@ -125,13 +217,12 @@ def _draw_nurnie_editor(layout, obj, wm, base_type, side):
     box.operator(flip_operator, text="Flip Nurnie", icon='MOD_MIRROR')
     box.operator(mirror_operator, text="Mirror To Other Side", icon='UV_SYNC_SELECT')
 
-    box = layout.box()
-    box.label(text="Asset", icon='FILE_FOLDER')
+    box = _draw_section_header(layout, "Asset", 'FILE_FOLDER')
     box.prop(wm, "my_previews_dir")
     box.template_icon_view(wm, "my_previews")
     box.operator(change_operator, text="Change Nurnie", icon='FILE_REFRESH')
 
-    box = layout.box()
+    box = _draw_section_header(layout, "Remove", 'TRASH')
     box.operator(delete_operator, text="Remove Nurnie", icon='TRASH')
 
 
@@ -139,8 +230,7 @@ def _draw_nurnie_add(layout, wm, side):
     label = "Add Left Nurnie" if side == "LEFT" else "Add Right Nurnie"
     operator = "addnurnieleft.myop_operator" if side == "LEFT" else "addnurnieright.myop_operator"
 
-    box = layout.box()
-    box.label(text=label, icon='MESH_PLANE')
+    box = _draw_section_header(layout, label, 'MESH_PLANE')
     box.prop(wm, "my_previews_dir")
     box.template_icon_view(wm, "my_previews")
     box.operator(operator, text=label)
@@ -172,6 +262,7 @@ class OBJECT_PT_NamePlate(Panel):
             if plate_obj:
                 target_name = mytool.my_item
                 target_obj = _get_target_object(context, target_name)
+                _draw_build_summary(layout, mytool, base_obj, scene)
                 _draw_edit_actions(layout, mytool, import_plate)
 
                 if target_name == LEFT_NURNIE_OBJECT and target_obj:
@@ -193,43 +284,43 @@ class OBJECT_PT_NamePlate(Panel):
                 plate_target = target_obj if target_name == PLATE_OBJECT and target_obj else None
                 if plate_target:
                     if import_plate:
-                        box = layout.box()
-                        box.label(text="Plate Position", icon='ORIENTATION_GLOBAL')
+                        box = _draw_section_header(layout, "Imported Plate Position", 'ORIENTATION_GLOBAL')
                         box.prop(plate_target, 'location', index=2, text='Up / Down')
                         box.prop(plate_target, 'location', index=1, text='Back / Forward')
                     else:
-                        row = layout.row()
+                        box = _draw_section_header(layout, "Build", 'MOD_BUILD')
+                        row = box.row()
                         row.label(text="Autodraw")
                         row.prop(mytool, "autodraw")
                         if not mytool.autodraw:
-                            layout.operator("draw.myop_operator", text="Create Plate", icon='GREASEPENCIL')
+                            box.operator("draw.myop_operator", text="Create Plate", icon='GREASEPENCIL')
 
-                        box = layout.box()
-                        row = box.row()
+                        basic_box = layout.box()
+                        row = basic_box.row()
                         row.prop(mytool, "basic_options")
                         row.label(text="Basic Plate Options")
                         if mytool.basic_options:
-                            row = box.row()
+                            row = basic_box.row()
                             row.label(text="Engravable Plate")
                             row.prop(mytool, "eng_bot")
 
                             if mytool.my_baselist in {"BCIRCLE", "BSPECIAL"}:
-                                box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
-                                box.prop(mytool, "angles", expand=True)
+                                basic_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
+                                basic_box.prop(mytool, "angles", expand=True)
 
                             if mytool.my_baselist == "BOVAL":
                                 if base_type == "L":
-                                    box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
-                                    box.prop(mytool, "o_angles", expand=True)
+                                    basic_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
+                                    basic_box.prop(mytool, "o_angles", expand=True)
                                 else:
-                                    box.label(text="Only comes in 90 degrees")
+                                    basic_box.label(text="Only comes in 90 degrees")
 
-                            box.label(text="End Style", icon='IMAGE_ALPHA')
-                            box.prop(mytool, "my_main_ends", expand=True)
-                            box.label(text="End Cap Width", icon='FACE_MAPS')
-                            box.prop(mytool, "end_length", expand=True)
-                            box.label(text="Plate Height", icon='EMPTY_SINGLE_ARROW')
-                            box.prop(mytool, "my_user_z", expand=True)
+                            basic_box.label(text="End Style", icon='IMAGE_ALPHA')
+                            basic_box.prop(mytool, "my_main_ends", expand=True)
+                            basic_box.label(text="End Cap Width", icon='FACE_MAPS')
+                            basic_box.prop(mytool, "end_length", expand=True)
+                            basic_box.label(text="Plate Height", icon='EMPTY_SINGLE_ARROW')
+                            basic_box.prop(mytool, "my_user_z", expand=True)
 
                         box = layout.box()
                         row = box.row()
@@ -262,39 +353,11 @@ class OBJECT_PT_NamePlate(Panel):
 
             if import_plate:
                 if not empty_obj:
-                    box = layout.box()
-                    box.operator("wm.importhelp", text="!!PLEASE READ!!")
-                    box.label(text="Choose your base shape", icon='PROP_ON')
-                    box.prop(mytool, "my_baselist", expand=True)
-                    box.label(text="Choose your base size", icon='PROP_ON')
-                    box.prop(mytool, "my_" + mytool.my_baselist, expand=True)
-                    if base_obj:
-                        box.operator("getready.myop_operator", text="Confirm Base Choice", icon='CHECKBOX_HLT')
+                    _draw_import_alignment_panel(layout, mytool, base_obj)
                 return
 
             if not empty_obj:
-                box = layout.box()
-                box.label(text="Get Started")
-                box = layout.box()
-                box.label(text="Choose a workflow")
-                layout.prop(mytool, "my_newbase", expand=True)
-
-                if mytool.my_newbase == "IMPORT":
-                    box = layout.box()
-                    box.label(text="Import a previously saved plate")
-                    box = layout.box()
-                    box.operator("object.import_stl_custom", text="Import a Saved Plate", icon='FILE_NEW')
-
-                if mytool.my_newbase == "NEW":
-                    box = layout.box()
-                    box.label(text="Create a new plate", icon='FILE_NEW')
-                    box = layout.box()
-                    box.label(text="Choose your base shape", icon='PROP_ON')
-                    box.prop(mytool, "my_baselist", expand=True)
-                    box.label(text="Choose your base size", icon='PROP_ON')
-                    box.prop(mytool, "my_" + mytool.my_baselist, expand=True)
-                    if base_obj:
-                        box.operator("getready.myop_operator", text="Confirm Base Choice", icon='FILE_NEW')
+                _draw_setup_panel(layout, mytool, base_obj)
                 return
 
         except Exception as e:

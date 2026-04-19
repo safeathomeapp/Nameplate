@@ -2,10 +2,22 @@ import os
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Vector
+
+from .constants import (
+    BASE_OBJECT,
+    LEFT_NUR_OBJECT,
+    LEFT_NURNIE_OBJECT,
+    MAIN_TEXT_OBJECT,
+    PLATE_OBJECT,
+    RIGHT_NUR_OBJECT,
+    RIGHT_NURNIE_OBJECT,
+    UPPER_TEXT_OBJECT,
+)
 
 
 preview_collections = {}
+_IS_PROGRAMMATIC_EDIT_TARGET_FOCUS = False
 
 BASE_CURVE_DATA = {
     "L060": ((30.3, 34.4), (44.1, 54.7), (51.7, 67.0)),
@@ -478,13 +490,167 @@ def set_locationY(self, value):
     self['locationY'] = float(value)
 
 
-def selectItem(self, context):
-    name = str(bpy.context.scene.my_tool.my_item)
-    menu = bpy.context.scene.objects.get(name)
-    if menu:
+def _get_view3d_override_context():
+    window = getattr(bpy.context, "window", None)
+    if window is None:
+        return None
+
+    screen = getattr(window, "screen", None)
+    if screen is None:
+        return None
+
+    for area in screen.areas:
+        if area.type != 'VIEW_3D':
+            continue
+        for region in area.regions:
+            if region.type == 'WINDOW':
+                return {
+                    "window": window,
+                    "screen": screen,
+                    "area": area,
+                    "region": region,
+                    "scene": bpy.context.scene,
+                    "view_layer": bpy.context.view_layer,
+                }
+    return None
+
+
+def _is_plate_view_target(target_name):
+    return target_name in {PLATE_OBJECT, MAIN_TEXT_OBJECT, UPPER_TEXT_OBJECT}
+
+
+def _get_focus_target_object(scene, target_name):
+    if _is_plate_view_target(target_name):
+        return scene.objects.get(PLATE_OBJECT)
+    if target_name == LEFT_NURNIE_OBJECT:
+        return scene.objects.get(LEFT_NUR_OBJECT) or scene.objects.get(LEFT_NURNIE_OBJECT)
+    if target_name == RIGHT_NURNIE_OBJECT:
+        return scene.objects.get(RIGHT_NUR_OBJECT) or scene.objects.get(RIGHT_NURNIE_OBJECT)
+    return scene.objects.get(target_name)
+
+
+def _get_base_span(scene):
+    base_obj = scene.objects.get(BASE_OBJECT)
+    if base_obj is None or not getattr(base_obj, "dimensions", None):
+        return 0.0
+    return max(base_obj.dimensions.x, base_obj.dimensions.y, base_obj.dimensions.z)
+
+
+def _get_base_type(scene):
+    base_obj = scene.objects.get(BASE_OBJECT)
+    if base_obj is None or not getattr(base_obj, "data", None):
+        return ""
+    return str(getattr(base_obj.data, "name", ""))[:1]
+
+
+def _apply_view_focus(target_name, focus_target):
+    override = _get_view3d_override_context()
+    if override is None:
+        return
+
+    try:
+        with bpy.context.temp_override(**override):
+            region_3d = override["area"].spaces.active.region_3d
+
+            if _is_plate_view_target(target_name):
+                bpy.ops.view3d.view_axis(type='FRONT', align_active=False)
+            bpy.ops.view3d.view_selected(use_all_regions=False)
+
+            if _is_plate_view_target(target_name):
+                base_rotation = region_3d.view_rotation.copy()
+                delta_rotation = Euler((-(0.174533), 0.0, 0.0), 'XYZ').to_quaternion()
+                region_3d.view_rotation = base_rotation @ delta_rotation
+                region_3d.view_perspective = 'PERSP'
+                base_span = _get_base_span(bpy.context.scene)
+                half_base_span = base_span * 0.5
+                target_span = max(focus_target.dimensions) if focus_target is not None and getattr(focus_target, "dimensions", None) else 0.0
+                computed_distance = max(0.1, half_base_span + max(24.0, target_span * 0.18))
+                region_3d.view_distance = computed_distance
+                print(
+                    "[Nameplate] Plate/Text view distance:",
+                    f"target={target_name}",
+                    f"base_span={base_span:.3f}",
+                    f"half_base_span={half_base_span:.3f}",
+                    f"target_span={target_span:.3f}",
+                    f"view_distance={computed_distance:.3f}",
+                )
+            elif target_name in {LEFT_NURNIE_OBJECT, RIGHT_NURNIE_OBJECT} and focus_target is not None:
+                base_span = _get_base_span(bpy.context.scene)
+                base_type = _get_base_type(bpy.context.scene)
+                target_distance = focus_target.matrix_world.translation.length
+                target_span = max(focus_target.dimensions) if getattr(focus_target, "dimensions", None) else 0.0
+
+                bpy.ops.view3d.view_axis(type='FRONT', align_active=False)
+                region_3d.view_perspective = 'PERSP'
+
+                if base_type == "S":
+                    base_rotation = region_3d.view_rotation.copy()
+                    delta_rotation = Euler((-(0.174533), 0.0, 0.0), 'XYZ').to_quaternion()
+                    region_3d.view_rotation = base_rotation @ delta_rotation
+                else:
+                    side_turn = -1.047198 if target_name == LEFT_NURNIE_OBJECT else 1.047198
+                    delta_rotation = Euler((-(0.174533), side_turn, 0.0), 'XYZ').to_quaternion()
+                    region_3d.view_rotation = region_3d.view_rotation.copy() @ delta_rotation
+                    region_3d.view_location = Vector((0.0, 0.0, 0.0))
+
+                computed_distance = max(0.1, base_span + target_distance + max(20.0, target_span * 4.5))
+                region_3d.view_distance = computed_distance
+                print(
+                    "[Nameplate] Nurnie view distance:",
+                    f"base_type={base_type}",
+                    f"base_span={base_span:.3f}",
+                    f"target_distance={target_distance:.3f}",
+                    f"target_span={target_span:.3f}",
+                    f"view_distance={computed_distance:.3f}",
+                )
+    except Exception:
+        pass
+
+
+def _focus_edit_target(context, target_name):
+    global _IS_PROGRAMMATIC_EDIT_TARGET_FOCUS
+
+    scene = getattr(context, "scene", None)
+    if scene is None or not hasattr(scene, "my_tool"):
+        return
+
+    menu = scene.objects.get(target_name)
+    if menu is None:
+        return
+
+    focus_target = _get_focus_target_object(scene, target_name)
+    if focus_target is None:
+        return
+
+    _IS_PROGRAMMATIC_EDIT_TARGET_FOCUS = True
+    try:
         _deselect_all()
         _set_active(menu)
         menu.select_set(True)
+
+        if _is_plate_view_target(target_name):
+            _deselect_all()
+            _set_active(focus_target)
+            focus_target.select_set(True)
+        elif focus_target is not menu:
+            focus_target.select_set(True)
+
+        _apply_view_focus(target_name, focus_target)
+
+        if _is_plate_view_target(target_name):
+            _deselect_all()
+            _set_active(menu)
+            menu.select_set(True)
+        elif focus_target is not None and focus_target is not menu:
+            focus_target.select_set(False)
+            _set_active(menu)
+    finally:
+        _IS_PROGRAMMATIC_EDIT_TARGET_FOCUS = False
+
+
+def selectItem(self, context):
+    name = str(bpy.context.scene.my_tool.my_item)
+    _focus_edit_target(bpy.context, name)
     # If the requested target does not exist yet, keep the current selection.
     # This is important for add-state UI such as left/right nurnies, where
     # forcing selection back to BASE makes the panel feel like it needs

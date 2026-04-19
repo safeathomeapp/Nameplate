@@ -3,6 +3,8 @@ import os
 from bpy.types import Panel
 from bpy.app.handlers import persistent
 
+from . import helpers
+
 from .constants import (
     BASE_OBJECT,
     EMPTY_OBJECT,
@@ -88,6 +90,9 @@ def _sync_edit_target_from_active_object(context, mytool):
 @persistent
 def _sync_edit_target_handler(_scene, _depsgraph):
     global _LAST_ACTIVE_TARGET_NAME
+
+    if helpers._IS_PROGRAMMATIC_EDIT_TARGET_FOCUS:
+        return
 
     context = bpy.context
     scene = getattr(context, "scene", None)

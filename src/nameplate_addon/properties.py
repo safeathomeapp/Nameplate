@@ -127,7 +127,13 @@ class MyProperties(PropertyGroup):
     )
 
     end_length: bpy.props.EnumProperty(
-        items=[('2', "2mm End Caps", ""), ('3', "3mm End Caps", ""), ('4', "4mm End Caps", ""), ('5', "5mm End Caps", ""), ('6', "6mm End Caps", "")],
+        items=[
+            ('2', "2mm End Caps", ""),
+            ('3', "3mm End Caps", ""),
+            ('4', "4mm End Caps", ""),
+            ('5', "5mm End Caps", ""),
+            ('6', "6mm End Caps", ""),
+        ],
         default='4',
         update=drawPlate
     )
@@ -166,7 +172,6 @@ class MyProperties(PropertyGroup):
         items=[("NEW", "NEW", "NEW"), ("IMPORT", "IMPORT", "IMPORT")],
         default="NEW",
     )
-
 
 def register():
     bpy.utils.register_class(MyProperties)

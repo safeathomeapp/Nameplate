@@ -1,4 +1,5 @@
 import bpy
+import os
 from bpy.types import Panel
 from bpy.app.handlers import persistent
 
@@ -12,6 +13,7 @@ from .constants import (
     RIGHT_NURNIE_OBJECT,
     UPPER_TEXT_OBJECT,
 )
+from .icons import get_icon_id
 
 _LAST_ACTIVE_TARGET_NAME = None
 
@@ -26,40 +28,44 @@ def _draw_section_header(layout, title, icon):
     return box
 
 
-def _get_base_summary(mytool, base_obj):
-    if not base_obj or not getattr(base_obj, "data", None):
-        return ("No base", "")
-
-    base_code = base_obj.data.name
-    family_labels = {
-        "BCIRCLE": "Circle",
-        "BOVAL": "Oval",
-        "BSQUARE": "Square",
-        "BSPECIAL": "Special",
-    }
-    family = family_labels.get(mytool.my_baselist, base_code[:1])
-    return (family, base_code[1:])
+def _draw_enum_button_row(layout, data_path, current_value, items):
+    row = layout.row(align=True)
+    for value, label in items:
+        op = row.operator(
+            "wm.context_set_enum",
+            text=label,
+            depress=(str(current_value) == str(value)),
+        )
+        op.data_path = data_path
+        op.value = str(value)
 
 
-def _draw_build_summary(layout, mytool, base_obj, scene):
-    family, size_label = _get_base_summary(mytool, base_obj)
-    left_nurnie = "Yes" if scene.objects.get(LEFT_NURNIE_OBJECT) else "No"
-    right_nurnie = "Yes" if scene.objects.get(RIGHT_NURNIE_OBJECT) else "No"
-    top_plate = "On" if mytool.add_top else "Off"
+def _draw_end_style_icon_row(layout, data_path, current_value):
+    grid = layout.grid_flow(
+        row_major=True,
+        columns=4,
+        even_columns=True,
+        even_rows=True,
+        align=True,
+    )
 
-    box = _draw_section_header(layout, "Current Build", 'INFO')
-    col = box.column(align=True)
-    col.label(text=f"Base: {family} {size_label}".strip())
-    col.label(text=f"Height: {mytool.my_user_z}mm")
-    col.label(text=f"Top Plate: {top_plate}")
-    col.label(text=f"Nurnies: L {left_nurnie} | R {right_nurnie}")
+    button_defs = (
+        ("PLAIN", "SQUARE"),
+        ("CHAMFER", "CHAMFERED"),
+        ("SLANT", "SLANTED"),
+        ("BEVEL", "ROUNDED"),
+    )
 
-    if mytool.my_baselist in {"BCIRCLE", "BSPECIAL"}:
-        arc_map = {"25": "90", "33": "120", "41": "150", "50": "180"}
-        col.label(text=f"Arc: {arc_map.get(mytool.angles, mytool.angles)} degrees")
-    elif mytool.my_baselist == "BOVAL":
-        arc_map = {"0": "90", "1": "120", "2": "135"}
-        col.label(text=f"Arc: {arc_map.get(mytool.o_angles, mytool.o_angles)} degrees")
+    for enum_value, icon_name in button_defs:
+        cell = grid.column(align=True)
+        op = cell.operator(
+            "wm.context_set_enum",
+            text="",
+            icon_value=get_icon_id(icon_name),
+            depress=(str(current_value) == enum_value),
+        )
+        op.data_path = data_path
+        op.value = enum_value
 
 
 def _sync_edit_target_from_active_object(context, mytool):
@@ -229,11 +235,104 @@ def _draw_nurnie_editor(layout, obj, wm, base_type, side):
 def _draw_nurnie_add(layout, wm, side):
     label = "Add Left Nurnie" if side == "LEFT" else "Add Right Nurnie"
     operator = "addnurnieleft.myop_operator" if side == "LEFT" else "addnurnieright.myop_operator"
+    previews_dir = getattr(wm, "my_previews_dir", "")
+    preview_value = getattr(wm, "my_previews", "")
+    has_valid_dir = bool(previews_dir and os.path.isdir(previews_dir))
+    has_preview_choice = bool(preview_value)
+    can_add_nurnie = has_valid_dir and has_preview_choice
 
     box = _draw_section_header(layout, label, 'MESH_PLANE')
+    box.label(text="Choose an icon and add it to the plate.")
     box.prop(wm, "my_previews_dir")
     box.template_icon_view(wm, "my_previews")
-    box.operator(operator, text=label)
+    if not can_add_nurnie:
+        box.label(text="Load a folder with PNG icon previews first.", icon='INFO')
+
+    row = box.row()
+    row.enabled = can_add_nurnie
+    row.operator(operator, text=label)
+
+
+def _draw_plate_editor(layout, mytool, plate_target, import_plate, base_type):
+    if import_plate:
+        box = _draw_section_header(layout, "Imported Plate Position", 'ORIENTATION_GLOBAL')
+        box.prop(plate_target, 'location', index=2, text='Up / Down')
+        box.prop(plate_target, 'location', index=1, text='Back / Forward')
+        return
+
+    shape_box = _draw_section_header(layout, "Shape", 'MOD_BUILD')
+    row = shape_box.row(align=True)
+    row.label(text="Autodraw")
+    row.prop(mytool, "autodraw")
+    if not mytool.autodraw:
+        shape_box.operator("draw.myop_operator", text="Create Plate", icon='GREASEPENCIL')
+
+    row = shape_box.row()
+    row.label(text="Engravable Plate")
+    row.prop(mytool, "eng_bot")
+
+    if mytool.my_baselist in {"BCIRCLE", "BSPECIAL"}:
+        shape_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
+        _draw_enum_button_row(
+            shape_box,
+            "scene.my_tool.angles",
+            mytool.angles,
+            (("25", "90"), ("33", "120"), ("41", "150"), ("50", "180")),
+        )
+
+    if mytool.my_baselist == "BOVAL":
+        if base_type == "L":
+            shape_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
+            shape_box.prop(mytool, "o_angles", expand=True)
+        else:
+            shape_box.label(text="Only comes in 90 degrees")
+
+    shape_box.label(text="End Style", icon='IMAGE_ALPHA')
+    _draw_end_style_icon_row(shape_box, "scene.my_tool.my_main_ends", mytool.my_main_ends)
+    shape_box.label(text="End Cap Width (mm)", icon='FACE_MAPS')
+    _draw_enum_button_row(
+        shape_box,
+        "scene.my_tool.end_length",
+        mytool.end_length,
+        (("2", "2"), ("3", "3"), ("4", "4"), ("5", "5"), ("6", "6")),
+    )
+    shape_box.label(text="Plate Height (mm)", icon='EMPTY_SINGLE_ARROW')
+    _draw_enum_button_row(
+        shape_box,
+        "scene.my_tool.my_user_z",
+        mytool.my_user_z,
+        (("3", "3"), ("4", "4"), ("5", "5"), ("6", "6")),
+    )
+
+    top_box = _draw_section_header(layout, "Top Plate", 'ANCHOR_TOP')
+    row = top_box.row()
+    row.label(text="Enable Top Plate")
+    row.prop(mytool, "add_top")
+    if mytool.add_top:
+        top_box.label(text="Top Plate Height", icon='EXPORT')
+        _draw_enum_button_row(
+            top_box,
+            "scene.my_tool.my_top_height",
+            mytool.my_top_height,
+            (("3", "1.5"), ("4", "2"), ("5", "2.5"), ("6", "3")),
+        )
+        top_box.label(text="Coverage", icon='PROP_PROJECTED')
+        _draw_enum_button_row(
+            top_box,
+            "scene.my_tool.top_angles",
+            mytool.top_angles,
+            (("25", "1/4"), ("50", "1/2"), ("75", "3/4"), ("100", "Full")),
+        )
+        label = "Put On Top" if mytool.drop_top_halfway else "Drop Half Way"
+        icon = 'ANCHOR_TOP' if mytool.drop_top_halfway else 'ANCHOR_CENTER'
+        top_box.prop(mytool, "drop_top_halfway", text=label, icon=icon, toggle=True)
+        top_box.label(text="Top End Style", icon='IMAGE_ALPHA')
+        _draw_end_style_icon_row(top_box, "scene.my_tool.my_top_ends", mytool.my_top_ends)
+
+    advanced_box = _draw_section_header(layout, "Advanced", 'PREFERENCES')
+    row = advanced_box.row()
+    row.label(text="Add FOV Cutout", icon='LINCURVE')
+    row.prop(mytool, "fov_option")
 
 
 class OBJECT_PT_NamePlate(Panel):
@@ -262,7 +361,6 @@ class OBJECT_PT_NamePlate(Panel):
             if plate_obj:
                 target_name = mytool.my_item
                 target_obj = _get_target_object(context, target_name)
-                _draw_build_summary(layout, mytool, base_obj, scene)
                 _draw_edit_actions(layout, mytool, import_plate)
 
                 if target_name == LEFT_NURNIE_OBJECT and target_obj:
@@ -283,71 +381,7 @@ class OBJECT_PT_NamePlate(Panel):
 
                 plate_target = target_obj if target_name == PLATE_OBJECT and target_obj else None
                 if plate_target:
-                    if import_plate:
-                        box = _draw_section_header(layout, "Imported Plate Position", 'ORIENTATION_GLOBAL')
-                        box.prop(plate_target, 'location', index=2, text='Up / Down')
-                        box.prop(plate_target, 'location', index=1, text='Back / Forward')
-                    else:
-                        box = _draw_section_header(layout, "Build", 'MOD_BUILD')
-                        row = box.row()
-                        row.label(text="Autodraw")
-                        row.prop(mytool, "autodraw")
-                        if not mytool.autodraw:
-                            box.operator("draw.myop_operator", text="Create Plate", icon='GREASEPENCIL')
-
-                        basic_box = layout.box()
-                        row = basic_box.row()
-                        row.prop(mytool, "basic_options")
-                        row.label(text="Basic Plate Options")
-                        if mytool.basic_options:
-                            row = basic_box.row()
-                            row.label(text="Engravable Plate")
-                            row.prop(mytool, "eng_bot")
-
-                            if mytool.my_baselist in {"BCIRCLE", "BSPECIAL"}:
-                                basic_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
-                                basic_box.prop(mytool, "angles", expand=True)
-
-                            if mytool.my_baselist == "BOVAL":
-                                if base_type == "L":
-                                    basic_box.label(text="Arc of nameplate", icon='PROP_PROJECTED')
-                                    basic_box.prop(mytool, "o_angles", expand=True)
-                                else:
-                                    basic_box.label(text="Only comes in 90 degrees")
-
-                            basic_box.label(text="End Style", icon='IMAGE_ALPHA')
-                            basic_box.prop(mytool, "my_main_ends", expand=True)
-                            basic_box.label(text="End Cap Width", icon='FACE_MAPS')
-                            basic_box.prop(mytool, "end_length", expand=True)
-                            basic_box.label(text="Plate Height", icon='EMPTY_SINGLE_ARROW')
-                            basic_box.prop(mytool, "my_user_z", expand=True)
-
-                        box = layout.box()
-                        row = box.row()
-                        row.prop(mytool, "top_options")
-                        row.label(text="Top Plate Options")
-                        if mytool.top_options:
-                            row = box.row()
-                            row.label(text="Add top plate")
-                            row.prop(mytool, "add_top")
-                            box.label(text="Top Plate Height", icon='EXPORT')
-                            box.prop(mytool, "my_top_height", expand=True)
-                            box.label(text="Coverage", icon='PROP_PROJECTED')
-                            box.prop(mytool, "top_angles", expand=True)
-                            label = "Put On Top" if mytool.drop_top_halfway else "Drop Half Way"
-                            icon = 'ANCHOR_TOP' if mytool.drop_top_halfway else 'ANCHOR_CENTER'
-                            box.prop(mytool, "drop_top_halfway", text=label, icon=icon, toggle=True)
-                            box.label(text="Top End Style")
-                            box.prop(mytool, "my_top_ends", expand=True)
-
-                        box = layout.box()
-                        row = box.row()
-                        row.prop(mytool, "addit_options")
-                        row.label(text="Advanced options")
-                        if mytool.addit_options:
-                            row = box.row()
-                            row.label(text="Add FOV Cutout", icon='LINCURVE')
-                            row.prop(mytool, "fov_option")
+                    _draw_plate_editor(layout, mytool, plate_target, import_plate, base_type)
 
                 return
 

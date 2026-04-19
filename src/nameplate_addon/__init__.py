@@ -13,9 +13,11 @@ bl_info = {
 from . import operators
 from . import properties
 from . import ui
+from . import icons
 
 
 def register():
+    icons.register()
     properties.register()
     operators.register()
     ui.register()
@@ -25,3 +27,4 @@ def unregister():
     ui.unregister()
     operators.unregister()
     properties.unregister()
+    icons.unregister()

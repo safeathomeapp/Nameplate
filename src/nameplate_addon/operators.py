@@ -62,8 +62,8 @@ def _get_nurnie_anchor_location(side, base_type, base_size_x, base_size_y):
 
     if base_type == "S":
         if side == "LEFT":
-            return (2, -base_size_y * .5 - .5, -user_z)
-        return (base_size_x - 2, -base_size_y * .5 - .5, -user_z)
+            return (2, -base_size_y * .5 - .5, user_z)
+        return (base_size_x - 2, -base_size_y * .5 - .5, user_z)
 
     if base_type == "L":
         oval_choice = int(bpy.context.scene.my_tool.o_angles)
@@ -127,14 +127,14 @@ def _configure_nurnie_anchor(anchor_name, nur_name, scale_value):
     store_nurnie_anchor_state(bpy.data.objects[anchor_name])
 
 
-def _create_nurnie_anchor_plane(anchor_name, anchor_location):
+def _create_nurnie_anchor_plane(anchor_name, anchor_location, apply_location=True):
     bpy.ops.mesh.primitive_plane_add(
         enter_editmode=False,
         align='WORLD',
         location=anchor_location
     )
     bpy.ops.transform.resize(value=(0.1, 0.1, 0.1), orient_type='GLOBAL')
-    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    bpy.ops.object.transform_apply(location=apply_location, rotation=False, scale=True)
     bpy.context.active_object.name = anchor_name
 
 
@@ -245,7 +245,7 @@ def _add_or_change_nurnie(context, side, preserve_anchor_state=False):
     _import_selected_nurnie(context, config["nur"])
 
     anchor_location = _get_nurnie_anchor_location(side, base_type, base_size_x, base_size_y)
-    _create_nurnie_anchor_plane(config["nurnie"], anchor_location)
+    _create_nurnie_anchor_plane(config["nurnie"], anchor_location, apply_location=(base_type != "S"))
 
     if anchor_state:
         bpy.context.object.location[0] = anchor_state["x"]

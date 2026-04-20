@@ -181,7 +181,7 @@ def _draw_text_editor(layout, obj, text, mytool, engrave_prop, italic_prop, extr
     box.prop(text, 'body', text="")
 
     box = _draw_section_header(layout, "Font And Position", 'FONT_DATA')
-    box.template_ID(text, "font", open="font.open", unlink="font.unlink")
+    box.template_ID(text, "font", open="nameplate.open_font", unlink="font.unlink")
 
     row = box.row()
     row.label(text="Engrave On Export")

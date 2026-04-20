@@ -1,7 +1,9 @@
 import os
 
 import bpy
+from bpy.props import StringProperty
 from bpy.types import Operator
+from bpy_extras.io_utils import ImportHelper
 
 from .constants import (
     BASE_OBJECT,
@@ -47,6 +49,93 @@ from .helpers import (
     unhidenurnieright,
 )
 from .plate import drawPlateTrue
+
+
+def _get_addon_preferences(context=None):
+    context = context or bpy.context
+    addon = getattr(getattr(context, "preferences", None), "addons", {}).get(__package__)
+    return addon.preferences if addon else None
+
+
+def _apply_saved_previews_dir_to_window_manager():
+    prefs = _get_addon_preferences()
+    wm = getattr(bpy.context, "window_manager", None)
+    if not prefs or wm is None or not hasattr(wm, "my_previews_dir"):
+        return
+    saved_dir = getattr(prefs, "saved_previews_dir", "")
+    if saved_dir and wm.my_previews_dir != saved_dir:
+        wm.my_previews_dir = saved_dir
+
+
+def _update_saved_previews_dir(self, context):
+    prefs = _get_addon_preferences(context)
+    if prefs is not None:
+        prefs.saved_previews_dir = getattr(self, "my_previews_dir", "")
+
+
+class NAMEPLATE_AddonPreferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
+
+    saved_previews_dir: StringProperty(
+        name="Saved STL/Preview Directory",
+        subtype='DIR_PATH',
+        default="",
+    )
+    saved_font_dir: StringProperty(
+        name="Saved Font Directory",
+        subtype='DIR_PATH',
+        default="",
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Persisted Name Plate directories")
+        layout.prop(self, "saved_previews_dir")
+        layout.prop(self, "saved_font_dir")
+
+
+class NAMEPLATE_OT_open_font(Operator, ImportHelper):
+    bl_idname = "nameplate.open_font"
+    bl_label = "Open Font"
+    filename_ext = ".ttf"
+
+    filter_glob: StringProperty(
+        default="*.ttf;*.otf;*.ttc;*.otc;*.woff;*.woff2",
+        options={'HIDDEN'},
+    )
+
+    def invoke(self, context, event):
+        prefs = _get_addon_preferences(context)
+        saved_font_dir = getattr(prefs, "saved_font_dir", "") if prefs else ""
+        if saved_font_dir and os.path.isdir(saved_font_dir):
+            self.filepath = os.path.join(saved_font_dir, "select_font.ttf")
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        target_obj = context.object
+        if not target_obj or target_obj.type != 'FONT':
+            self.report({'ERROR'}, "Select a text object before loading a font")
+            return {'CANCELLED'}
+
+        filepath = bpy.path.abspath(self.filepath)
+        if not filepath or not os.path.isfile(filepath):
+            self.report({'ERROR'}, "Choose a valid font file")
+            return {'CANCELLED'}
+
+        try:
+            font = bpy.data.fonts.load(filepath, check_existing=True)
+        except Exception as exc:
+            self.report({'ERROR'}, f"Failed to load font: {exc}")
+            return {'CANCELLED'}
+
+        target_obj.data.font = font
+
+        prefs = _get_addon_preferences(context)
+        if prefs is not None:
+            prefs.saved_font_dir = os.path.dirname(filepath)
+
+        return {'FINISHED'}
 
 
 def selectBase(self, context):
@@ -929,6 +1018,7 @@ class Getready_OT_my_op(Operator):
 
 
 CLASSES = [
+    NAMEPLATE_OT_open_font,
     WM_OT_ImportHelpWindow,
     FLIPNURNIELEFT_OT_my_op,
     ADDNURNIELEFT_OT_my_op,
@@ -953,14 +1043,26 @@ CLASSES = [
 
 def register():
     from bpy.types import WindowManager
-    from bpy.props import EnumProperty, StringProperty
+    from bpy.props import EnumProperty
 
-    WindowManager.my_previews_dir = StringProperty(name="", subtype='DIR_PATH', default="")
+    bpy.utils.register_class(NAMEPLATE_AddonPreferences)
+
+    saved_previews_dir = ""
+    prefs = _get_addon_preferences()
+    if prefs is not None:
+        saved_previews_dir = getattr(prefs, "saved_previews_dir", "")
+
+    WindowManager.my_previews_dir = StringProperty(
+        name="",
+        subtype='DIR_PATH',
+        default=saved_previews_dir,
+        update=_update_saved_previews_dir,
+    )
     WindowManager.my_previews = EnumProperty(items=enum_previews_from_directory_items)
 
     try:
-        import bpy.utils.previews
-        pcoll = bpy.utils.previews.new()
+        from bpy.utils import previews
+        pcoll = previews.new()
         pcoll.my_previews_dir = ""
         pcoll.my_previews = ()
         preview_collections["main"] = pcoll
@@ -969,6 +1071,8 @@ def register():
 
     for cls in CLASSES:
         bpy.utils.register_class(cls)
+
+    _apply_saved_previews_dir_to_window_manager()
 
 
 def unregister():
@@ -980,9 +1084,9 @@ def unregister():
         del WindowManager.my_previews_dir
 
     try:
-        import bpy.utils.previews
+        from bpy.utils import previews
         for pcoll in preview_collections.values():
-            bpy.utils.previews.remove(pcoll)
+            previews.remove(pcoll)
     except Exception:
         pass
     preview_collections.clear()
@@ -992,3 +1096,8 @@ def unregister():
             bpy.utils.unregister_class(cls)
         except Exception:
             pass
+
+    try:
+        bpy.utils.unregister_class(NAMEPLATE_AddonPreferences)
+    except Exception:
+        pass

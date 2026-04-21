@@ -94,10 +94,16 @@ def drawPlateTrue(self, context):
 
     delete_managed_objects()
 
-    loc_y = -base_size_y * 0.5
+    path_y = -base_size_y * 0.5
+    main_plate_depth = 1.5 if bpy.context.scene.my_tool.eng_bot else user_y
+    full_plate_depth = user_y + border_thickness
+    loc_y = path_y - (main_plate_depth * 0.5)
+    main_outer_y = loc_y - (main_plate_depth * 0.5)
+    border_y = main_outer_y - (border_depth * 0.5)
+    full_depth_y = path_y - (full_plate_depth * 0.5)
 
     if bpy.context.scene.my_tool.eng_bot:
-        bpy.ops.mesh.primitive_cube_add(align='WORLD', location=(0, loc_y - 0.25, user_z * 0.5),
+        bpy.ops.mesh.primitive_cube_add(align='WORLD', location=(0, loc_y, user_z * 0.5),
                                         scale=halfscale(user_x, 1.5, user_z))
     else:
         bpy.ops.mesh.primitive_cube_add(align='WORLD', location=(0, loc_y, user_z * 0.5),
@@ -109,7 +115,7 @@ def drawPlateTrue(self, context):
 
     bpy.ops.mesh.primitive_cube_add(
         align='WORLD',
-        location=(0, loc_y - (user_y - border_thickness * 0.5), user_z - (border_thickness * 0.5)),
+        location=(0, border_y, user_z - (border_thickness * 0.5)),
         scale=halfscale(user_x, border_depth, border_thickness)
     )
     top_border = bpy.context.active_object
@@ -119,7 +125,7 @@ def drawPlateTrue(self, context):
 
     bpy.ops.mesh.primitive_cube_add(
         align='WORLD',
-        location=(0, loc_y - (user_y - border_thickness * 0.5), border_thickness * 0.5),
+        location=(0, border_y, border_thickness * 0.5),
         scale=halfscale(user_x, border_depth, border_thickness)
     )
     bottom_border = bpy.context.active_object
@@ -132,7 +138,7 @@ def drawPlateTrue(self, context):
 
         bpy.ops.mesh.primitive_cube_add(
             align='WORLD',
-            location=(0, loc_y - border_thickness * 0.5, top_position),
+            location=(0, full_depth_y, top_position),
             scale=halfscale(user_x * top_panel_curve, user_y + border_thickness, top_height)
         )
         c = bpy.context.active_object
@@ -156,7 +162,7 @@ def drawPlateTrue(self, context):
 
         loc = (
             sign * ((user_x * 0.5) + (end_length * 0.5)),
-            -((base_size_y + border_thickness) * 0.5),
+            full_depth_y,
             user_z * 0.5
         )
 
@@ -173,7 +179,7 @@ def drawPlateTrue(self, context):
         c["nameplate_managed"] = True
         c["nameplate_role"] = name
 
-    bpy.context.scene.cursor.location = (0, -base_size_y * 0.5, 0)
+    bpy.context.scene.cursor.location = (0, path_y, 0)
 
     _deselect_all()
     join_order = ("NameplateBottom", "NameplateTop", "END_LEFT", "END_RIGHT", "TopBit", "NameplateBase")
@@ -195,15 +201,17 @@ def drawPlateTrue(self, context):
     plate["nameplate_managed"] = True
     plate["nameplate_role"] = PLATE_OBJECT
 
-    plate.rotation_euler[0] = -0.261799
+    plate.rotation_euler[0] = 0.0
     plate.rotation_euler[1] = 0.0
     plate.rotation_euler[2] = 0.0
-
-    plate.location[2] = -0.15
     try:
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
     except Exception:
         pass
+
+    plate.rotation_euler[0] = -0.261799
+    plate.rotation_euler[1] = 0.0
+    plate.rotation_euler[2] = 0.0
 
     try:
         rem = plate.modifiers.new(name="Remesh", type='REMESH')
@@ -219,5 +227,3 @@ def drawPlateTrue(self, context):
         simp.angle = curve_x
     except Exception:
         pass
-
-    plate.location[2] = user_z * 0.5 + 0.2
